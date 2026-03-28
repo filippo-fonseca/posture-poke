@@ -79,26 +79,18 @@ function RecentChart({ data }: { data: ChartDataPoint[] }) {
         >
           <defs>
             <linearGradient id="historyFill" x1="0" y1="5" x2="0" y2="195" gradientUnits="userSpaceOnUse">
-              <stop
-                offset="0%"
-                stopColor="#ef4444"
-                stopOpacity={isDark ? 0.2 : 0.1}
-              />
-              <stop offset={greenStop} stopColor="#ef4444" stopOpacity={0.02} />
-              <stop offset={greenStop} stopColor="#22c55e" stopOpacity={0.02} />
-              <stop
-                offset="100%"
-                stopColor="#22c55e"
-                stopOpacity={isDark ? 0.2 : 0.1}
-              />
+              <stop key="f0" offset="0%" stopColor="#ef4444" stopOpacity={isDark ? 0.2 : 0.1} />
+              <stop key="f1" offset={greenStop} stopColor="#ef4444" stopOpacity={0.02} />
+              <stop key="f2" offset={greenStop} stopColor="#22c55e" stopOpacity={0.02} />
+              <stop key="f3" offset="100%" stopColor="#22c55e" stopOpacity={isDark ? 0.2 : 0.1} />
             </linearGradient>
             <linearGradient id="historyStroke" x1="0" y1="5" x2="0" y2="195" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#ef4444" />
-              <stop offset={amberStop} stopColor="#ef4444" />
-              <stop offset={amberStop} stopColor="#f59e0b" />
-              <stop offset={greenStop} stopColor="#f59e0b" />
-              <stop offset={greenStop} stopColor="#22c55e" />
-              <stop offset="100%" stopColor="#22c55e" />
+              <stop key="s0" offset="0%" stopColor="#ef4444" />
+              <stop key="s1" offset={amberStop} stopColor="#ef4444" />
+              <stop key="s2" offset={amberStop} stopColor="#f59e0b" />
+              <stop key="s3" offset={greenStop} stopColor="#f59e0b" />
+              <stop key="s4" offset={greenStop} stopColor="#22c55e" />
+              <stop key="s5" offset="100%" stopColor="#22c55e" />
             </linearGradient>
           </defs>
 

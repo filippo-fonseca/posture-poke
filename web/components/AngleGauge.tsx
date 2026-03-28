@@ -6,10 +6,9 @@ import { useSettings } from "@/lib/settings";
 
 interface AngleGaugeProps {
   currentDelta: number;
-  onCalibrate: () => void;
 }
 
-export function AngleGauge({ currentDelta, onCalibrate }: AngleGaugeProps) {
+export function AngleGauge({ currentDelta }: AngleGaugeProps) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const { slouchThreshold } = useSettings();
@@ -149,12 +148,6 @@ export function AngleGauge({ currentDelta, onCalibrate }: AngleGaugeProps) {
         </span>
       </div>
 
-      <button
-        onClick={onCalibrate}
-        className="mt-4 w-full rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-4 py-2 text-sm text-zinc-600 dark:text-zinc-300 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-zinc-100"
-      >
-        Recalibrate Baseline
-      </button>
     </div>
   );
 }
