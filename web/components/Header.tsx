@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useTheme } from "@/lib/theme";
+import { useAuth } from "@/lib/auth";
 
 interface HeaderProps {
   isConnected: boolean;
@@ -18,14 +19,15 @@ function formatTime(seconds: number): string {
 
 export function Header({ isConnected, sessionDuration }: HeaderProps) {
   const { theme, toggle } = useTheme();
+  const { user, signOut } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-14 items-center justify-between">
-          <h1 className="text-lg font-bold tracking-tight">SpineSync</h1>
+          <h1 className="text-lg font-bold tracking-tight">PosturePoke</h1>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {isConnected ? (
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -45,6 +47,17 @@ export function Header({ isConnected, sessionDuration }: HeaderProps) {
                 </span>
               </div>
             )}
+
+            <Link
+              href="/sessions"
+              className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
+              aria-label="Session history"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+            </Link>
 
             <Link
               href="/settings"
@@ -73,6 +86,25 @@ export function Header({ isConnected, sessionDuration }: HeaderProps) {
                 </svg>
               )}
             </button>
+
+            {user && (
+              <button
+                onClick={signOut}
+                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
+              >
+                {user.photoURL ? (
+                  <img
+                    src={user.photoURL}
+                    alt=""
+                    className="h-5 w-5 rounded-full"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="h-5 w-5 rounded-full bg-zinc-200 dark:bg-zinc-700" />
+                )}
+                <span className="hidden sm:inline">Sign out</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

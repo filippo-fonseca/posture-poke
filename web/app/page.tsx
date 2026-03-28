@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useTheme } from "@/lib/theme";
+import { useAuth } from "@/lib/auth";
 import Link from "next/link";
 
 const fade = {
@@ -90,6 +91,8 @@ const iconColors: Record<string, string> = {
 
 export default function Landing() {
   const { theme, toggle } = useTheme();
+  const { user } = useAuth();
+  const appHref = user ? "/dashboard" : "/login";
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -100,10 +103,10 @@ export default function Landing() {
             <span className="text-lg font-bold tracking-tight">PosturePoke</span>
             <div className="flex items-center gap-3">
               <Link
-                href="/dashboard"
+                href={appHref}
                 className="rounded-md bg-zinc-900 dark:bg-zinc-100 px-4 py-1.5 text-sm font-medium text-white dark:text-zinc-900 transition-colors hover:bg-zinc-700 dark:hover:bg-zinc-300"
               >
-                Launch App
+                {user ? "Dashboard" : "Launch App"}
               </Link>
               <button
                 onClick={toggle}
@@ -164,10 +167,10 @@ export default function Landing() {
               className="mt-8 flex flex-col sm:flex-row items-center gap-3"
             >
               <Link
-                href="/dashboard"
+                href={appHref}
                 className="rounded-lg bg-zinc-900 dark:bg-zinc-100 px-6 py-2.5 text-sm font-medium text-white dark:text-zinc-900 transition-colors hover:bg-zinc-700 dark:hover:bg-zinc-300"
               >
-                Launch Dashboard
+                {user ? "Go to Dashboard" : "Get Started"}
               </Link>
               <a
                 href="#how-it-works"
@@ -385,14 +388,14 @@ export default function Landing() {
                 Your spine called. It wants better posture.
               </motion.h2>
               <motion.p custom={1} variants={fade} className="mt-3 text-zinc-500 dark:text-zinc-400">
-                Open the dashboard and start a session. No account needed.
+                Sign in with Google and start a session.
               </motion.p>
               <motion.div custom={2} variants={fade} className="mt-6">
                 <Link
-                  href="/dashboard"
+                  href={appHref}
                   className="inline-block rounded-lg bg-zinc-900 dark:bg-zinc-100 px-8 py-3 text-sm font-medium text-white dark:text-zinc-900 transition-colors hover:bg-zinc-700 dark:hover:bg-zinc-300"
                 >
-                  Launch Dashboard
+                  {user ? "Go to Dashboard" : "Get Started"}
                 </Link>
               </motion.div>
             </motion.div>

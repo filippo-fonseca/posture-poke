@@ -7,36 +7,40 @@ import {
   STRICTNESS_LEVELS,
   HARSHNESS_LEVELS,
 } from "@/lib/settings";
+import { AuthGuard } from "@/components/AuthGuard";
+import { useCoaches } from "@/hooks/useCoaches";
 
 export default function SettingsPage() {
+  return (
+    <AuthGuard>
+      <SettingsContent />
+    </AuthGuard>
+  );
+}
+
+function SettingsContent() {
   const { settings, update } = useSettings();
   const router = useRouter();
+  const {
+    coaches,
+    loading: coachesLoading,
+    canCreate,
+    createCoach,
+    deleteCoach,
+    setActiveCoach,
+  } = useCoaches();
   const [isGenerating, setIsGenerating] = useState(false);
-  const [coachPrompt, setCoachPrompt] = useState(settings.coachDescription);
+  const [coachPrompt, setCoachPrompt] = useState("");
   const [generateError, setGenerateError] = useState<string | null>(null);
 
   const handleGenerate = async () => {
-    if (!coachPrompt.trim()) return;
+    if (!coachPrompt.trim() || !canCreate) return;
     setIsGenerating(true);
     setGenerateError(null);
 
     try {
-      const res = await fetch("/api/coach/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: coachPrompt.trim() }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to generate coach");
-      }
-
-      const data = await res.json();
-      update({
-        coachDescription: coachPrompt.trim(),
-        coachAudioFiles: data.audio_files,
-      });
+      await createCoach(coachPrompt);
+      setCoachPrompt("");
     } catch (err: unknown) {
       setGenerateError(
         err instanceof Error ? err.message : "Something went wrong"
@@ -52,7 +56,7 @@ export default function SettingsPage() {
         <div className="mx-auto max-w-2xl px-4 sm:px-6">
           <div className="flex h-14 items-center justify-between">
             <button
-              onClick={() => router.push("/")}
+              onClick={() => router.push("/dashboard")}
               className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
             >
               <svg
@@ -171,42 +175,113 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          {/* Coach config */}
+          {/* Coach Management */}
           {settings.instructionType === "coach" && (
             <section>
-              <h2 className="text-sm font-medium mb-1">Coach Personality</h2>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
-                Describe your coach&apos;s voice and personality. 10 unique
-                audio clips will be generated.
-              </p>
-              <textarea
-                value={coachPrompt}
-                onChange={(e) => setCoachPrompt(e.target.value)}
-                placeholder='e.g. A sarcastic Gordon Ramsay-like drill sergeant who roasts your posture with British wit...'
-                className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 py-3 text-sm placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 resize-none"
-                rows={3}
-              />
-              <div className="mt-3 flex items-center gap-3">
-                <button
-                  onClick={handleGenerate}
-                  disabled={isGenerating || !coachPrompt.trim()}
-                  className="rounded-lg bg-zinc-900 dark:bg-zinc-100 px-4 py-2 text-sm font-medium text-white dark:text-zinc-900 transition-opacity hover:opacity-80 disabled:opacity-40"
-                >
-                  {isGenerating ? "Generating..." : "Generate Coach"}
-                </button>
-                {settings.coachAudioFiles.length > 0 && !isGenerating && (
-                  <span className="text-xs text-emerald-600 dark:text-emerald-400">
-                    {settings.coachAudioFiles.length} clips ready
-                  </span>
-                )}
-                {isGenerating && (
-                  <span className="text-xs text-zinc-400 dark:text-zinc-500">
-                    This may take a minute...
-                  </span>
-                )}
+              <div className="flex items-baseline justify-between mb-3">
+                <div>
+                  <h2 className="text-sm font-medium">Your Coaches</h2>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    {coaches.length}/5 coaches
+                  </p>
+                </div>
               </div>
-              {generateError && (
-                <p className="mt-2 text-xs text-red-500">{generateError}</p>
+
+              {/* Existing coaches */}
+              {coachesLoading ? (
+                <div className="space-y-2">
+                  <div className="shimmer h-16 w-full rounded-lg" />
+                  <div className="shimmer h-16 w-full rounded-lg" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {coaches.map((coach) => (
+                    <div
+                      key={coach.id}
+                      className={`rounded-lg border p-3 flex items-center justify-between transition-colors cursor-pointer ${
+                        settings.activeCoachId === coach.id
+                          ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20"
+                          : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
+                      }`}
+                      onClick={() => coach.id && setActiveCoach(coach.id)}
+                    >
+                      <div className="flex-1 min-w-0 mr-3">
+                        <p className="text-sm truncate">
+                          {coach.description}
+                        </p>
+                        <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">
+                          {coach.audioFiles.length} clips
+                          {settings.activeCoachId === coach.id && (
+                            <span className="ml-2 text-emerald-600 dark:text-emerald-400 font-medium">
+                              Active
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (coach.id) deleteCoach(coach.id);
+                        }}
+                        className="rounded p-1.5 text-zinc-400 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-500 transition-colors"
+                        aria-label="Delete coach"
+                      >
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Create new coach */}
+              {canCreate && (
+                <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
+                  <h3 className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-2">
+                    Create New Coach
+                  </h3>
+                  <textarea
+                    value={coachPrompt}
+                    onChange={(e) => setCoachPrompt(e.target.value)}
+                    placeholder='e.g. A sarcastic Gordon Ramsay-like drill sergeant who roasts your posture...'
+                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 py-3 text-sm placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 resize-none"
+                    rows={2}
+                  />
+                  <div className="mt-2 flex items-center gap-3">
+                    <button
+                      onClick={handleGenerate}
+                      disabled={isGenerating || !coachPrompt.trim()}
+                      className="rounded-lg bg-zinc-900 dark:bg-zinc-100 px-4 py-2 text-sm font-medium text-white dark:text-zinc-900 transition-opacity hover:opacity-80 disabled:opacity-40"
+                    >
+                      {isGenerating ? "Generating..." : "Generate Coach"}
+                    </button>
+                    {isGenerating && (
+                      <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                        This may take a minute...
+                      </span>
+                    )}
+                  </div>
+                  {generateError && (
+                    <p className="mt-2 text-xs text-red-500">{generateError}</p>
+                  )}
+                </div>
+              )}
+
+              {!canCreate && (
+                <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-500">
+                  Maximum 5 coaches reached. Delete one to create a new one.
+                </p>
               )}
             </section>
           )}

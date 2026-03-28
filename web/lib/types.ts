@@ -19,9 +19,58 @@ export interface MinuteBucket {
   totalReadings: number;
 }
 
+export interface PunishmentMarker {
+  time: string;
+  secondsIn: number;
+  type: "fart" | "coach";
+}
+
+export interface CoachDoc {
+  id?: string;
+  description: string;
+  audioFiles: string[];
+  voiceId: string;
+  scripts: string[];
+  sessionId: string;
+  createdAt: number;
+}
+
+export interface SessionDoc {
+  id?: string;
+  startedAt: number;
+  endedAt: number;
+  durationSeconds: number;
+  goodPct: number;
+  alertCount: number;
+  bestStreak: number;
+  slouchThreshold: number;
+  instructionType: "farts" | "coach";
+  coachId: string | null;
+  chartData: ChartDataPoint[];
+  punishmentMarkers: PunishmentMarker[];
+}
+
+export type SessionState = "idle" | "running" | "paused";
+
+export interface SessionSaveData {
+  startTime: number;
+  allChartData: ChartDataPoint[];
+  sessionDuration: number;
+  goodPct: number;
+  alertCount: number;
+  bestStreak: number;
+}
+
 export interface PostureSession {
   // Connection
   isConnected: boolean;
+
+  // Session state
+  sessionState: SessionState;
+  startSession: () => void;
+  pauseSession: () => void;
+  resumeSession: () => void;
+  stopSession: () => SessionSaveData;
 
   // Live data
   currentDelta: number;

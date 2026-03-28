@@ -2,7 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { usePostureStream } from "./usePostureStream";
-import { ChartDataPoint, MinuteBucket, PostureSession } from "@/lib/types";
+import {
+  ChartDataPoint,
+  MinuteBucket,
+  PostureSession,
+  SessionSaveData,
+  SessionState,
+} from "@/lib/types";
 import {
   DEFAULT_TIP,
   CHART_HISTORY_SECONDS,
@@ -12,10 +18,12 @@ import {
 import { useSettings } from "@/lib/settings";
 
 export function usePostureSession(): PostureSession {
-  const { isConnected, currentDelta, lastTimestamp, sendCalibrate } = usePostureStream();
+  const { isConnected, currentDelta, lastTimestamp, sendCalibrate } =
+    usePostureStream();
   const { slouchThreshold } = useSettings();
 
-  // Session tracking
+  // Session state machine
+  const [sessionState, setSessionState] = useState<SessionState>("idle");
   const [sessionStart, setSessionStart] = useState<number | null>(null);
   const [sessionDuration, setSessionDuration] = useState(0);
 
@@ -30,13 +38,13 @@ export function usePostureSession(): PostureSession {
   const [alertCount, setAlertCount] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
 
-  // Chart data - full session stored in ref, derived views in state
+  // Chart data
   const allSessionDataRef = useRef<ChartDataPoint[]>([]);
   const [liveChartData, setLiveChartData] = useState<ChartDataPoint[]>([]);
   const [recentChartData, setRecentChartData] = useState<ChartDataPoint[]>([]);
   const deltaBufferRef = useRef<number[]>([]);
 
-  // Minute buckets - stored in ref to avoid dependency issues
+  // Minute buckets
   const minuteBucketsRef = useRef<MinuteBucket[]>([]);
   const [minuteBuckets, setMinuteBuckets] = useState<MinuteBucket[]>([]);
   const currentMinuteRef = useRef({ good: 0, total: 0 });
@@ -45,60 +53,104 @@ export function usePostureSession(): PostureSession {
   // AI coach
   const [currentTip, setCurrentTip] = useState(DEFAULT_TIP);
   const [isFetchingTip, setIsFetchingTip] = useState(false);
-  const [lastTipFetchedAt, setLastTipFetchedAt] = useState<number | null>(null);
+  const [lastTipFetchedAt, setLastTipFetchedAt] = useState<number | null>(
+    null
+  );
 
-  // Track previous slouch state for alert counting
   const wasSlouchingRef = useRef(false);
+
+  // Session controls
+  const startSession = useCallback(() => {
+    setSessionState("running");
+    setSessionStart(Date.now());
+    setSessionDuration(0);
+    setGoodReadings(0);
+    setTotalReadings(0);
+    setAlertCount(0);
+    setBestStreak(0);
+    setCurrentSlouchDuration(0);
+    setCurrentStreakDuration(0);
+    allSessionDataRef.current = [];
+    deltaBufferRef.current = [];
+    minuteBucketsRef.current = [];
+    currentMinuteRef.current = { good: 0, total: 0 };
+    lastMinuteIndexRef.current = 0;
+    setLiveChartData([]);
+    setRecentChartData([]);
+    setMinuteBuckets([]);
+    wasSlouchingRef.current = false;
+  }, []);
+
+  const pauseSession = useCallback(() => {
+    setSessionState("paused");
+  }, []);
+
+  const resumeSession = useCallback(() => {
+    setSessionState("running");
+  }, []);
+
+  const stopSession = useCallback((): SessionSaveData => {
+    const data: SessionSaveData = {
+      startTime: sessionStart ?? Date.now(),
+      allChartData: [...allSessionDataRef.current],
+      sessionDuration,
+      goodPct:
+        totalReadings > 0
+          ? Math.round((goodReadings / totalReadings) * 100)
+          : 100,
+      alertCount,
+      bestStreak,
+    };
+    setSessionState("idle");
+    setSessionStart(null);
+    setSessionDuration(0);
+    allSessionDataRef.current = [];
+    setLiveChartData([]);
+    setRecentChartData([]);
+    setMinuteBuckets([]);
+    return data;
+  }, [sessionStart, sessionDuration, goodReadings, totalReadings, alertCount, bestStreak]);
 
   // Session timer
   useEffect(() => {
-    if (!isConnected) return;
-
-    if (sessionStart === null) {
-      setSessionStart(Date.now());
-    }
+    if (sessionState !== "running" || !sessionStart) return;
 
     const interval = setInterval(() => {
-      if (sessionStart) {
-        setSessionDuration(Math.floor((Date.now() - sessionStart) / 1000));
-      }
+      setSessionDuration(Math.floor((Date.now() - sessionStart) / 1000));
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isConnected, sessionStart]);
+  }, [sessionState, sessionStart]);
 
-  // Process incoming data
+  // Process incoming data (only when running)
   useEffect(() => {
-    if (!isConnected || lastTimestamp === null) return;
+    if (sessionState !== "running" || !isConnected || lastTimestamp === null)
+      return;
 
     const isCurrentlySlouching = currentDelta > slouchThreshold;
     setIsSlouchingNow(isCurrentlySlouching);
 
-    // Count readings
     setTotalReadings((prev) => prev + 1);
     if (!isCurrentlySlouching) {
       setGoodReadings((prev) => prev + 1);
     }
 
-    // Track minute bucket
     currentMinuteRef.current.total += 1;
     if (!isCurrentlySlouching) {
       currentMinuteRef.current.good += 1;
     }
 
-    // Detect threshold crossings (slouch start)
     if (isCurrentlySlouching && !wasSlouchingRef.current) {
       setAlertCount((prev) => prev + 1);
     }
     wasSlouchingRef.current = isCurrentlySlouching;
 
-    // Buffer delta for chart (we downsample to 1/sec)
     deltaBufferRef.current.push(currentDelta);
-  }, [currentDelta, lastTimestamp, isConnected, slouchThreshold]);
+  }, [currentDelta, lastTimestamp, isConnected, slouchThreshold, sessionState]);
 
-  // Update streaks and slouch duration (1Hz)
+  // Update streaks (1Hz, only when running)
   useEffect(() => {
-    if (!isConnected) return;
+    if (sessionState !== "running") return;
 
     const interval = setInterval(() => {
       if (isSlouchingNow) {
@@ -115,16 +167,15 @@ export function usePostureSession(): PostureSession {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isConnected, isSlouchingNow]);
+  }, [sessionState, isSlouchingNow]);
 
-  // Update chart data every time sessionDuration ticks (1Hz, no interval lag)
+  // Update chart data on sessionDuration tick (only when running)
   useEffect(() => {
-    if (!isConnected || sessionDuration === 0) return;
+    if (sessionState !== "running" || sessionDuration === 0) return;
 
     const buffer = deltaBufferRef.current;
     if (buffer.length === 0) return;
 
-    // Average the buffered readings
     const avgDelta = buffer.reduce((a, b) => a + b, 0) / buffer.length;
     deltaBufferRef.current = [];
 
@@ -138,23 +189,27 @@ export function usePostureSession(): PostureSession {
       threshold: slouchThreshold,
     };
 
-    // Push to full session history
     allSessionDataRef.current.push(newPoint);
 
-    // Derive views
     const allData = allSessionDataRef.current;
     setLiveChartData(allData.slice(-CHART_HISTORY_SECONDS));
     setRecentChartData(allData.slice(-RECENT_HISTORY_SECONDS));
 
-    // Check if we crossed a minute boundary
     const currentMinuteIndex = Math.floor(sessionDuration / 60);
-    if (currentMinuteIndex > lastMinuteIndexRef.current && lastMinuteIndexRef.current > 0) {
+    if (
+      currentMinuteIndex > lastMinuteIndexRef.current &&
+      lastMinuteIndexRef.current > 0
+    ) {
       const { good, total } = currentMinuteRef.current;
       if (total > 0) {
         const pct = Math.round((good / total) * 100);
         const idx = lastMinuteIndexRef.current;
         const label = `${idx - 1}-${idx}m`;
-        const bucket: MinuteBucket = { label, goodPct: pct, totalReadings: total };
+        const bucket: MinuteBucket = {
+          label,
+          goodPct: pct,
+          totalReadings: total,
+        };
         minuteBucketsRef.current = [...minuteBucketsRef.current, bucket];
       }
       currentMinuteRef.current = { good: 0, total: 0 };
@@ -163,19 +218,22 @@ export function usePostureSession(): PostureSession {
       lastMinuteIndexRef.current = currentMinuteIndex;
     }
 
-    // Build minute buckets with current partial minute for display
     const { good, total } = currentMinuteRef.current;
     const completedBuckets = minuteBucketsRef.current;
     if (total > 0) {
       const partialPct = Math.round((good / total) * 100);
       const idx = Math.floor(sessionDuration / 60);
       const partialLabel = `${idx}-${idx + 1}m`;
-      const partial: MinuteBucket = { label: partialLabel, goodPct: partialPct, totalReadings: total };
+      const partial: MinuteBucket = {
+        label: partialLabel,
+        goodPct: partialPct,
+        totalReadings: total,
+      };
       setMinuteBuckets([...completedBuckets, partial]);
     } else {
       setMinuteBuckets(completedBuckets);
     }
-  }, [isConnected, sessionDuration]);
+  }, [sessionState, sessionDuration]);
 
   // Fetch AI tip
   const fetchTip = useCallback(async () => {
@@ -186,7 +244,6 @@ export function usePostureSession(): PostureSession {
     }
 
     setIsFetchingTip(true);
-
     try {
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -207,7 +264,6 @@ export function usePostureSession(): PostureSession {
           ],
         }),
       });
-
       const data = await response.json();
       if (data.content?.[0]?.text) {
         setCurrentTip(data.content[0].text);
@@ -220,12 +276,10 @@ export function usePostureSession(): PostureSession {
     }
   }, [currentSlouchDuration, currentDelta]);
 
-  // Auto-fetch tip when slouching too long
   useEffect(() => {
     if (currentSlouchDuration >= TIP_TRIGGER_DURATION) {
       const shouldFetch =
         lastTipFetchedAt === null || Date.now() - lastTipFetchedAt > 60000;
-
       if (shouldFetch && !isFetchingTip) {
         fetchTip();
       }
@@ -236,10 +290,18 @@ export function usePostureSession(): PostureSession {
     sendCalibrate();
   }, [sendCalibrate]);
 
-  const goodPct = totalReadings > 0 ? Math.round((goodReadings / totalReadings) * 100) : 100;
+  const goodPct =
+    totalReadings > 0
+      ? Math.round((goodReadings / totalReadings) * 100)
+      : 100;
 
   return {
     isConnected,
+    sessionState,
+    startSession,
+    pauseSession,
+    resumeSession,
+    stopSession,
     currentDelta,
     isSlouchingNow,
     currentSlouchDuration,

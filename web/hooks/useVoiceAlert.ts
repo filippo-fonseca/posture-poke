@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useSettings } from "@/lib/settings";
+import type { PunishmentMarker } from "@/lib/types";
 
 const FART_SOUNDS = [
   "/audio/fart-01.mp3",
@@ -17,16 +18,20 @@ const FART_SOUNDS = [
   "/audio/fart-squeak-03.mp3",
 ];
 
-const COOLDOWN = 15; // seconds between sounds
+const COOLDOWN = 15;
 
 interface UseVoiceAlertProps {
   isSlouchingNow: boolean;
   currentSlouchDuration: number;
+  sessionDuration: number;
+  onPunishment?: (marker: PunishmentMarker) => void;
 }
 
 export function useVoiceAlert({
   isSlouchingNow,
   currentSlouchDuration,
+  sessionDuration,
+  onPunishment,
 }: UseVoiceAlertProps) {
   const { settings, punishmentDelay } = useSettings();
   const lastPlayedRef = useRef<number>(0);
@@ -39,11 +44,12 @@ export function useVoiceAlert({
 
     lastPlayedRef.current = now;
 
-    let soundUrl: string;
-    if (
+    const isCoach =
       settings.instructionType === "coach" &&
-      settings.coachAudioFiles.length > 0
-    ) {
+      settings.coachAudioFiles.length > 0;
+
+    let soundUrl: string;
+    if (isCoach) {
       const file =
         settings.coachAudioFiles[
           Math.floor(Math.random() * settings.coachAudioFiles.length)
@@ -55,11 +61,23 @@ export function useVoiceAlert({
 
     const audio = new Audio(soundUrl);
     audio.play().catch(() => {});
+
+    if (onPunishment) {
+      const minutes = Math.floor(sessionDuration / 60);
+      const seconds = sessionDuration % 60;
+      onPunishment({
+        time: `${minutes}:${seconds.toString().padStart(2, "0")}`,
+        secondsIn: sessionDuration,
+        type: isCoach ? "coach" : "fart",
+      });
+    }
   }, [
     isSlouchingNow,
     currentSlouchDuration,
+    sessionDuration,
     punishmentDelay,
     settings.instructionType,
     settings.coachAudioFiles,
+    onPunishment,
   ]);
 }

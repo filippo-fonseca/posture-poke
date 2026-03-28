@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, DM_Mono } from "next/font/google";
-import { ThemeProvider } from "@/lib/theme";
-import { SettingsProvider } from "@/lib/settings";
+import { Providers } from "@/components/Providers";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -18,7 +17,7 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SpineSync — Real-time Posture Coaching",
+  title: "PosturePoke — Real-time Posture Coaching",
   description: "we got your back. literally.",
 };
 
@@ -41,9 +40,7 @@ export default function RootLayout({
         />
       </head>
       <body className="font-display antialiased bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-200">
-        <ThemeProvider>
-          <SettingsProvider>{children}</SettingsProvider>
-        </ThemeProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
