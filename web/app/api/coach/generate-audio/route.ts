@@ -58,14 +58,18 @@ export async function POST(req: Request) {
   const sessionId = randomUUID().slice(0, 8);
   const filenames: string[] = [];
 
-  // Generate all audio files concurrently
-  await Promise.all(
-    scripts.map(async (script: string, i: number) => {
-      const filename = `${sessionId}_${String(i).padStart(2, "0")}.mp3`;
-      filenames[i] = filename;
-      await ttsToFile(voice_id, script, path.join(AUDIO_DIR, filename));
-    })
-  );
+  // Generate audio in batches of 4 (ElevenLabs allows 5 concurrent)
+  for (let i = 0; i < scripts.length; i += 4) {
+    const batch = scripts.slice(i, i + 4);
+    await Promise.all(
+      batch.map(async (script: string, j: number) => {
+        const idx = i + j;
+        const filename = `${sessionId}_${String(idx).padStart(2, "0")}.mp3`;
+        filenames[idx] = filename;
+        await ttsToFile(voice_id, script, path.join(AUDIO_DIR, filename));
+      })
+    );
+  }
 
   return NextResponse.json({
     audio_files: filenames,

@@ -74,7 +74,7 @@ function RecentChart({ data }: { data: ChartDataPoint[] }) {
           margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
         >
           <defs>
-            <linearGradient id="historyFill" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id="historyFill" x1="0" y1="5" x2="0" y2="195" gradientUnits="userSpaceOnUse">
               <stop
                 offset="0%"
                 stopColor="#ef4444"
@@ -88,7 +88,7 @@ function RecentChart({ data }: { data: ChartDataPoint[] }) {
                 stopOpacity={isDark ? 0.2 : 0.1}
               />
             </linearGradient>
-            <linearGradient id="historyStroke" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id="historyStroke" x1="0" y1="5" x2="0" y2="195" gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor="#ef4444" />
               <stop offset="30%" stopColor="#ef4444" />
               <stop offset="30%" stopColor="#f59e0b" />

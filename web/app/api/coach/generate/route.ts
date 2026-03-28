@@ -25,13 +25,13 @@ Rules:
 Return ONLY a JSON array of 10 strings. Example: ["line 1", "line 2", ...]`;
 
   const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 1.0, maxOutputTokens: 1024 },
+        generationConfig: { temperature: 1.0, maxOutputTokens: 8192 },
       }),
     }
   );
@@ -39,7 +39,9 @@ Return ONLY a JSON array of 10 strings. Example: ["line 1", "line 2", ...]`;
   if (!resp.ok) throw new Error(`Gemini error: ${await resp.text()}`);
 
   const data = await resp.json();
-  let text: string = data.candidates[0].content.parts[0].text.trim();
+  // gemini-2.5-flash returns thought parts — grab the last non-thought part
+  const parts = data.candidates[0].content.parts;
+  let text: string = parts.filter((p: { thought?: boolean }) => !p.thought).pop().text.trim();
 
   if (text.startsWith("```")) {
     text = text.split("\n").slice(1).join("\n");
@@ -156,21 +158,26 @@ export async function POST(req: Request) {
     // 1. Generate scripts
     const scripts = await generateScripts(description);
 
-    // 2. Create voice (use first script as sample text)
-    const voiceId = await createVoice(description, scripts[0]);
+    // 2. Create voice (combine scripts so sample text meets ElevenLabs 100-char minimum)
+    const sampleText = scripts.slice(0, 3).join(" ");
+    const voiceId = await createVoice(description, sampleText);
 
-    // 3. Generate all audio files concurrently
+    // 3. Generate audio files in batches of 4 (ElevenLabs allows 5 concurrent)
     await mkdir(AUDIO_DIR, { recursive: true });
     const sessionId = randomUUID().slice(0, 8);
     const filenames: string[] = [];
 
-    await Promise.all(
-      scripts.map(async (script, i) => {
-        const filename = `${sessionId}_${String(i).padStart(2, "0")}.mp3`;
-        filenames[i] = filename;
-        await ttsToFile(voiceId, script, path.join(AUDIO_DIR, filename));
-      })
-    );
+    for (let i = 0; i < scripts.length; i += 4) {
+      const batch = scripts.slice(i, i + 4);
+      await Promise.all(
+        batch.map(async (script, j) => {
+          const idx = i + j;
+          const filename = `${sessionId}_${String(idx).padStart(2, "0")}.mp3`;
+          filenames[idx] = filename;
+          await ttsToFile(voiceId, script, path.join(AUDIO_DIR, filename));
+        })
+      );
+    }
 
     return NextResponse.json({
       scripts,

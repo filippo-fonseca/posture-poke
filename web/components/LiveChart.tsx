@@ -50,7 +50,7 @@ export function LiveChart({ data }: LiveChartProps) {
   return (
     <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
       <h3 className="mb-4 text-sm font-medium text-zinc-500 dark:text-zinc-400">
-        Deviation &mdash; Last 20 Seconds
+        Deviation &mdash; Last 60 Seconds
       </h3>
       <ResponsiveContainer width="100%" height={220}>
         <AreaChart
@@ -58,7 +58,7 @@ export function LiveChart({ data }: LiveChartProps) {
           margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
         >
           <defs>
-            <linearGradient id="liveChartFill" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id="liveChartFill" x1="0" y1="5" x2="0" y2="215" gradientUnits="userSpaceOnUse">
               <stop
                 offset="0%"
                 stopColor="#ef4444"
@@ -72,7 +72,7 @@ export function LiveChart({ data }: LiveChartProps) {
                 stopOpacity={isDark ? 0.25 : 0.12}
               />
             </linearGradient>
-            <linearGradient id="liveChartStroke" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id="liveChartStroke" x1="0" y1="5" x2="0" y2="215" gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor="#ef4444" />
               <stop offset="30%" stopColor="#ef4444" />
               <stop offset="30%" stopColor="#f59e0b" />

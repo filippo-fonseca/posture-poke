@@ -31,7 +31,7 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         voice_description: description,
-        text: "Hey, sit up straight! Your spine is not a banana!",
+        text: "Hey, sit up straight! Your spine is not a banana! I can see you slouching from here and frankly it is embarrassing for both of us.",
       }),
     }
   );

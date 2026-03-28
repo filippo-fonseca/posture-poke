@@ -116,70 +116,64 @@ export function usePostureSession(): PostureSession {
     return () => clearInterval(interval);
   }, [isConnected, isSlouchingNow]);
 
-  // Update chart data (1Hz - downsample from 20Hz) + minute buckets
+  // Update chart data every time sessionDuration ticks (1Hz, no interval lag)
   useEffect(() => {
-    if (!isConnected) return;
+    if (!isConnected || sessionDuration === 0) return;
 
-    const interval = setInterval(() => {
-      const buffer = deltaBufferRef.current;
-      if (buffer.length === 0) return;
+    const buffer = deltaBufferRef.current;
+    if (buffer.length === 0) return;
 
-      // Average the buffered readings
-      const avgDelta = buffer.reduce((a, b) => a + b, 0) / buffer.length;
-      deltaBufferRef.current = [];
+    // Average the buffered readings
+    const avgDelta = buffer.reduce((a, b) => a + b, 0) / buffer.length;
+    deltaBufferRef.current = [];
 
-      const timeInSession = sessionDuration;
-      const minutes = Math.floor(timeInSession / 60);
-      const seconds = timeInSession % 60;
-      const timeLabel = `${minutes}:${seconds.toString().padStart(2, "0")}`;
+    const minutes = Math.floor(sessionDuration / 60);
+    const seconds = sessionDuration % 60;
+    const timeLabel = `${minutes}:${seconds.toString().padStart(2, "0")}`;
 
-      const newPoint: ChartDataPoint = {
-        time: timeLabel,
-        delta: Math.round(avgDelta * 10) / 10,
-        threshold: SLOUCH_THRESHOLD,
-      };
+    const newPoint: ChartDataPoint = {
+      time: timeLabel,
+      delta: Math.round(avgDelta * 10) / 10,
+      threshold: SLOUCH_THRESHOLD,
+    };
 
-      // Push to full session history
-      allSessionDataRef.current.push(newPoint);
+    // Push to full session history
+    allSessionDataRef.current.push(newPoint);
 
-      // Derive views
-      const allData = allSessionDataRef.current;
-      setLiveChartData(allData.slice(-CHART_HISTORY_SECONDS));
-      setRecentChartData(allData.slice(-RECENT_HISTORY_SECONDS));
+    // Derive views
+    const allData = allSessionDataRef.current;
+    setLiveChartData(allData.slice(-CHART_HISTORY_SECONDS));
+    setRecentChartData(allData.slice(-RECENT_HISTORY_SECONDS));
 
-      // Check if we crossed a minute boundary
-      const currentMinuteIndex = Math.floor(timeInSession / 60);
-      if (currentMinuteIndex > lastMinuteIndexRef.current && lastMinuteIndexRef.current > 0) {
-        // Finalize the previous minute
-        const { good, total } = currentMinuteRef.current;
-        if (total > 0) {
-          const pct = Math.round((good / total) * 100);
-          const idx = lastMinuteIndexRef.current;
-          const label = `${idx - 1}-${idx}m`;
-          const bucket: MinuteBucket = { label, goodPct: pct, totalReadings: total };
-          minuteBucketsRef.current = [...minuteBucketsRef.current, bucket];
-        }
-        currentMinuteRef.current = { good: 0, total: 0 };
-        lastMinuteIndexRef.current = currentMinuteIndex;
-      } else if (lastMinuteIndexRef.current === 0 && timeInSession > 0) {
-        lastMinuteIndexRef.current = currentMinuteIndex;
-      }
-
-      // Build minute buckets with current partial minute for display
+    // Check if we crossed a minute boundary
+    const currentMinuteIndex = Math.floor(sessionDuration / 60);
+    if (currentMinuteIndex > lastMinuteIndexRef.current && lastMinuteIndexRef.current > 0) {
       const { good, total } = currentMinuteRef.current;
-      const completedBuckets = minuteBucketsRef.current;
       if (total > 0) {
-        const partialPct = Math.round((good / total) * 100);
-        const idx = Math.floor(timeInSession / 60);
-        const partialLabel = `${idx}-${idx + 1}m`;
-        const partial: MinuteBucket = { label: partialLabel, goodPct: partialPct, totalReadings: total };
-        setMinuteBuckets([...completedBuckets, partial]);
-      } else {
-        setMinuteBuckets(completedBuckets);
+        const pct = Math.round((good / total) * 100);
+        const idx = lastMinuteIndexRef.current;
+        const label = `${idx - 1}-${idx}m`;
+        const bucket: MinuteBucket = { label, goodPct: pct, totalReadings: total };
+        minuteBucketsRef.current = [...minuteBucketsRef.current, bucket];
       }
-    }, 1000);
+      currentMinuteRef.current = { good: 0, total: 0 };
+      lastMinuteIndexRef.current = currentMinuteIndex;
+    } else if (lastMinuteIndexRef.current === 0 && sessionDuration > 0) {
+      lastMinuteIndexRef.current = currentMinuteIndex;
+    }
 
-    return () => clearInterval(interval);
+    // Build minute buckets with current partial minute for display
+    const { good, total } = currentMinuteRef.current;
+    const completedBuckets = minuteBucketsRef.current;
+    if (total > 0) {
+      const partialPct = Math.round((good / total) * 100);
+      const idx = Math.floor(sessionDuration / 60);
+      const partialLabel = `${idx}-${idx + 1}m`;
+      const partial: MinuteBucket = { label: partialLabel, goodPct: partialPct, totalReadings: total };
+      setMinuteBuckets([...completedBuckets, partial]);
+    } else {
+      setMinuteBuckets(completedBuckets);
+    }
   }, [isConnected, sessionDuration]);
 
   // Fetch AI tip
@@ -237,13 +231,8 @@ export function usePostureSession(): PostureSession {
     }
   }, [currentSlouchDuration, lastTipFetchedAt, isFetchingTip, fetchTip]);
 
-  // Calibrate — reset baseline and clear chart history
   const calibrate = useCallback(() => {
     sendCalibrate();
-    allSessionDataRef.current = [];
-    setLiveChartData([]);
-    setRecentChartData([]);
-    deltaBufferRef.current = [];
   }, [sendCalibrate]);
 
   const goodPct = totalReadings > 0 ? Math.round((goodReadings / totalReadings) * 100) : 100;

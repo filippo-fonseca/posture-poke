@@ -6,7 +6,7 @@ import { AngleGauge } from "@/components/AngleGauge";
 import { LiveChart } from "@/components/LiveChart";
 import { StatsRow } from "@/components/StatsRow";
 import { HistoryChart } from "@/components/HistoryChart";
-import { CoachTip } from "@/components/CoachTip";
+
 import { usePostureSession } from "@/hooks/usePostureSession";
 import { useVoiceAlert } from "@/hooks/useVoiceAlert";
 
@@ -58,11 +58,7 @@ export default function Home() {
             minuteData={session.minuteBuckets}
           />
 
-          <CoachTip
-            tip={session.currentTip}
-            isFetching={session.isFetchingTip}
-            onFetchNew={session.fetchTip}
-          />
+
         </div>
       </main>
 
