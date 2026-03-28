@@ -37,50 +37,61 @@ void blinkError() {
   }
 }
 
-void setup() {
-  pinMode(LED_BUILTIN, OUTPUT);
-
-  // Init IMU
-  if (!IMU.begin()) {
-    blinkError();  // fast blink = IMU failed
-  }
-
-  // Init BLE
+// ── BLE init helper (called on startup + after every disconnect) ──
+void initBLE() {
   if (!BLE.begin()) {
-    blinkError();  // fast blink = BLE failed
+    blinkError();
   }
 
-  // Configure BLE advertising
   BLE.setLocalName(DEVICE_NAME);
   BLE.setAdvertisedService(postureService);
   postureService.addCharacteristic(tiltChar);
   BLE.addService(postureService);
-
-  // Start advertising
   BLE.advertise();
 
-  // Solid LED = ready and advertising
-  digitalWrite(LED_BUILTIN, HIGH);
+  digitalWrite(LED_BUILTIN, HIGH);  // LED on = advertising
+}
+
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+
+  // Init IMU (only once — survives BLE resets)
+  if (!IMU.begin()) {
+    blinkError();
+  }
+
+  initBLE();
 }
 
 void loop() {
   static unsigned long lastSend = 0;
   static bool wasConnected = false;
+  static unsigned long lastDataTime = 0;
 
-  // CRITICAL: poll the BLE stack every loop iteration.
-  // Without this, the library doesn't process disconnect/reconnect events.
   BLE.poll();
 
   BLEDevice central = BLE.central();
 
   if (central && central.connected()) {
-    // Just connected
     if (!wasConnected) {
       wasConnected = true;
+      lastDataTime = millis();
       digitalWrite(LED_BUILTIN, LOW);  // LED off = connected
     }
 
     unsigned long now = millis();
+
+    // Watchdog: if connected but no data sent for 5s, assume stuck
+    if (now - lastDataTime > 5000) {
+      // Force full BLE reset — nuclear option from the forums
+      wasConnected = false;
+      BLE.disconnect();
+      BLE.end();
+      delay(500);
+      initBLE();
+      return;
+    }
+
     if (now - lastSend >= INTERVAL_MS) {
       lastSend = now;
 
@@ -95,13 +106,17 @@ void loop() {
         memcpy(buf,     &pitch, 4);
         memcpy(buf + 4, &roll,  4);
         tiltChar.writeValue(buf, 8);
+
+        lastDataTime = now;  // reset watchdog
       }
     }
   } else if (wasConnected) {
-    // Just disconnected — explicitly restart advertising
+    // Disconnect detected — full BLE stack teardown and reinit
     wasConnected = false;
-    digitalWrite(LED_BUILTIN, HIGH);  // LED on = advertising
-    delay(500);                       // let BLE stack settle
-    BLE.advertise();                  // <-- THIS is the key fix
+    digitalWrite(LED_BUILTIN, HIGH);
+
+    BLE.end();        // tear down the entire BLE stack
+    delay(500);       // let the radio settle
+    initBLE();        // rebuild from scratch — fresh advertising
   }
 }
