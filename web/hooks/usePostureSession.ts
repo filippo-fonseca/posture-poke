@@ -4,15 +4,16 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { usePostureStream } from "./usePostureStream";
 import { ChartDataPoint, MinuteBucket, PostureSession } from "@/lib/types";
 import {
-  SLOUCH_THRESHOLD,
   DEFAULT_TIP,
   CHART_HISTORY_SECONDS,
   RECENT_HISTORY_SECONDS,
   TIP_TRIGGER_DURATION,
 } from "@/lib/constants";
+import { useSettings } from "@/lib/settings";
 
 export function usePostureSession(): PostureSession {
   const { isConnected, currentDelta, lastTimestamp, sendCalibrate } = usePostureStream();
+  const { slouchThreshold } = useSettings();
 
   // Session tracking
   const [sessionStart, setSessionStart] = useState<number | null>(null);
@@ -70,7 +71,7 @@ export function usePostureSession(): PostureSession {
   useEffect(() => {
     if (!isConnected || lastTimestamp === null) return;
 
-    const isCurrentlySlouching = currentDelta > SLOUCH_THRESHOLD;
+    const isCurrentlySlouching = currentDelta > slouchThreshold;
     setIsSlouchingNow(isCurrentlySlouching);
 
     // Count readings
@@ -93,7 +94,7 @@ export function usePostureSession(): PostureSession {
 
     // Buffer delta for chart (we downsample to 1/sec)
     deltaBufferRef.current.push(currentDelta);
-  }, [currentDelta, lastTimestamp, isConnected]);
+  }, [currentDelta, lastTimestamp, isConnected, slouchThreshold]);
 
   // Update streaks and slouch duration (1Hz)
   useEffect(() => {
@@ -134,7 +135,7 @@ export function usePostureSession(): PostureSession {
     const newPoint: ChartDataPoint = {
       time: timeLabel,
       delta: Math.round(avgDelta * 10) / 10,
-      threshold: SLOUCH_THRESHOLD,
+      threshold: slouchThreshold,
     };
 
     // Push to full session history

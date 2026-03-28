@@ -13,8 +13,8 @@ import {
   Cell,
 } from "recharts";
 import { ChartDataPoint, MinuteBucket } from "@/lib/types";
-import { SLOUCH_THRESHOLD } from "@/lib/constants";
 import { useTheme } from "@/lib/theme";
+import { useSettings } from "@/lib/settings";
 
 interface HistoryChartProps {
   recentData: ChartDataPoint[];
@@ -56,7 +56,11 @@ function RecentChart({ data }: { data: ChartDataPoint[] }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const textColor = isDark ? "#71717a" : "#a1a1aa";
+  const { slouchThreshold } = useSettings();
   const tickInterval = Math.max(1, Math.floor(data.length / 10));
+
+  const greenStop = `${(1 - slouchThreshold / 50) * 100}%`;
+  const amberStop = `${(1 - Math.min(slouchThreshold + 15, 50) / 50) * 100}%`;
 
   return (
     <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
@@ -80,8 +84,8 @@ function RecentChart({ data }: { data: ChartDataPoint[] }) {
                 stopColor="#ef4444"
                 stopOpacity={isDark ? 0.2 : 0.1}
               />
-              <stop offset="60%" stopColor="#ef4444" stopOpacity={0.02} />
-              <stop offset="60%" stopColor="#22c55e" stopOpacity={0.02} />
+              <stop offset={greenStop} stopColor="#ef4444" stopOpacity={0.02} />
+              <stop offset={greenStop} stopColor="#22c55e" stopOpacity={0.02} />
               <stop
                 offset="100%"
                 stopColor="#22c55e"
@@ -90,10 +94,10 @@ function RecentChart({ data }: { data: ChartDataPoint[] }) {
             </linearGradient>
             <linearGradient id="historyStroke" x1="0" y1="5" x2="0" y2="195" gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor="#ef4444" />
-              <stop offset="30%" stopColor="#ef4444" />
-              <stop offset="30%" stopColor="#f59e0b" />
-              <stop offset="60%" stopColor="#f59e0b" />
-              <stop offset="60%" stopColor="#22c55e" />
+              <stop offset={amberStop} stopColor="#ef4444" />
+              <stop offset={amberStop} stopColor="#f59e0b" />
+              <stop offset={greenStop} stopColor="#f59e0b" />
+              <stop offset={greenStop} stopColor="#22c55e" />
               <stop offset="100%" stopColor="#22c55e" />
             </linearGradient>
           </defs>
@@ -115,7 +119,7 @@ function RecentChart({ data }: { data: ChartDataPoint[] }) {
           />
 
           <ReferenceLine
-            y={SLOUCH_THRESHOLD}
+            y={slouchThreshold}
             stroke="#f59e0b"
             strokeDasharray="4 4"
             strokeOpacity={0.4}
@@ -125,7 +129,7 @@ function RecentChart({ data }: { data: ChartDataPoint[] }) {
             content={({ active, payload }) => {
               if (active && payload?.length) {
                 const d = payload[0].payload;
-                const bad = d.delta > SLOUCH_THRESHOLD;
+                const bad = d.delta > slouchThreshold;
                 return (
                   <div className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-1.5 shadow-sm">
                     <p className="font-mono text-sm">

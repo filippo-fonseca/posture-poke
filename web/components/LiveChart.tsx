@@ -10,8 +10,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { ChartDataPoint } from "@/lib/types";
-import { SLOUCH_THRESHOLD } from "@/lib/constants";
 import { useTheme } from "@/lib/theme";
+import { useSettings } from "@/lib/settings";
 
 interface LiveChartProps {
   data: ChartDataPoint[];
@@ -21,6 +21,11 @@ export function LiveChart({ data }: LiveChartProps) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const textColor = isDark ? "#71717a" : "#a1a1aa";
+  const { slouchThreshold } = useSettings();
+
+  // Gradient stops mapped to the Y-axis (0-50 domain, chart height 220, margins 5/5)
+  const greenStop = `${(1 - slouchThreshold / 50) * 100}%`;
+  const amberStop = `${(1 - Math.min(slouchThreshold + 15, 50) / 50) * 100}%`;
 
   if (data.length === 0) {
     return (
@@ -58,26 +63,40 @@ export function LiveChart({ data }: LiveChartProps) {
           margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
         >
           <defs>
-            <linearGradient id="liveChartFill" x1="0" y1="5" x2="0" y2="215" gradientUnits="userSpaceOnUse">
+            <linearGradient
+              id="liveChartFill"
+              x1="0"
+              y1="5"
+              x2="0"
+              y2="215"
+              gradientUnits="userSpaceOnUse"
+            >
               <stop
                 offset="0%"
                 stopColor="#ef4444"
                 stopOpacity={isDark ? 0.25 : 0.12}
               />
-              <stop offset="60%" stopColor="#ef4444" stopOpacity={0.02} />
-              <stop offset="60%" stopColor="#22c55e" stopOpacity={0.02} />
+              <stop offset={greenStop} stopColor="#ef4444" stopOpacity={0.02} />
+              <stop offset={greenStop} stopColor="#22c55e" stopOpacity={0.02} />
               <stop
                 offset="100%"
                 stopColor="#22c55e"
                 stopOpacity={isDark ? 0.25 : 0.12}
               />
             </linearGradient>
-            <linearGradient id="liveChartStroke" x1="0" y1="5" x2="0" y2="215" gradientUnits="userSpaceOnUse">
+            <linearGradient
+              id="liveChartStroke"
+              x1="0"
+              y1="5"
+              x2="0"
+              y2="215"
+              gradientUnits="userSpaceOnUse"
+            >
               <stop offset="0%" stopColor="#ef4444" />
-              <stop offset="30%" stopColor="#ef4444" />
-              <stop offset="30%" stopColor="#f59e0b" />
-              <stop offset="60%" stopColor="#f59e0b" />
-              <stop offset="60%" stopColor="#22c55e" />
+              <stop offset={amberStop} stopColor="#ef4444" />
+              <stop offset={amberStop} stopColor="#f59e0b" />
+              <stop offset={greenStop} stopColor="#f59e0b" />
+              <stop offset={greenStop} stopColor="#22c55e" />
               <stop offset="100%" stopColor="#22c55e" />
             </linearGradient>
           </defs>
@@ -99,7 +118,7 @@ export function LiveChart({ data }: LiveChartProps) {
           />
 
           <ReferenceLine
-            y={SLOUCH_THRESHOLD}
+            y={slouchThreshold}
             stroke="#f59e0b"
             strokeDasharray="4 4"
             strokeOpacity={0.5}

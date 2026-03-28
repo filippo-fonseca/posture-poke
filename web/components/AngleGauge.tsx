@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useTheme } from "@/lib/theme";
+import { useSettings } from "@/lib/settings";
 
 interface AngleGaugeProps {
   currentDelta: number;
@@ -11,6 +12,8 @@ interface AngleGaugeProps {
 export function AngleGauge({ currentDelta, onCalibrate }: AngleGaugeProps) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const { slouchThreshold } = useSettings();
+  const warningEnd = Math.min(slouchThreshold + 15, 50);
 
   const maxAngle = 50;
   const clampedDelta = Math.min(currentDelta, maxAngle);
@@ -33,8 +36,8 @@ export function AngleGauge({ currentDelta, onCalibrate }: AngleGaugeProps) {
   const endY = cy - radius * Math.sin(0);
 
   let color = "#22c55e";
-  if (currentDelta >= 35) color = "#ef4444";
-  else if (currentDelta >= 20) color = "#f59e0b";
+  if (currentDelta >= warningEnd) color = "#ef4444";
+  else if (currentDelta >= slouchThreshold) color = "#f59e0b";
 
   const bgArcPath = `M ${startX} ${startY} A ${radius} ${radius} 0 0 1 ${endX} ${endY}`;
   const valueArcPath =
@@ -47,9 +50,11 @@ export function AngleGauge({ currentDelta, onCalibrate }: AngleGaugeProps) {
 
   const zones = [
     { angle: 0, label: "0\u00B0" },
-    { angle: 20, label: "20\u00B0" },
-    { angle: 35, label: "35\u00B0" },
-    { angle: 50, label: "50\u00B0" },
+    { angle: slouchThreshold, label: `${slouchThreshold}\u00B0` },
+    ...(warningEnd < maxAngle - 3
+      ? [{ angle: warningEnd, label: `${warningEnd}\u00B0` }]
+      : []),
+    { angle: maxAngle, label: `${maxAngle}\u00B0` },
   ];
 
   return (
