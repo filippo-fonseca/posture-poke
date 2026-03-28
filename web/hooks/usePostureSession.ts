@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { usePostureStream } from "./usePostureStream";
+import { useSerial } from "./useSerial";
 import {
   ChartDataPoint,
   MinuteBucket,
@@ -18,8 +18,7 @@ import {
 import { useSettings } from "@/lib/settings";
 
 export function usePostureSession(): PostureSession {
-  const { isConnected, currentDelta, lastTimestamp, sendCalibrate } =
-    usePostureStream();
+  const serial = useSerial();
   const { slouchThreshold } = useSettings();
 
   // Session state machine
@@ -53,9 +52,7 @@ export function usePostureSession(): PostureSession {
   // AI coach
   const [currentTip, setCurrentTip] = useState(DEFAULT_TIP);
   const [isFetchingTip, setIsFetchingTip] = useState(false);
-  const [lastTipFetchedAt, setLastTipFetchedAt] = useState<number | null>(
-    null
-  );
+  const [lastTipFetchedAt, setLastTipFetchedAt] = useState<number | null>(null);
 
   const wasSlouchingRef = useRef(false);
 
@@ -70,6 +67,7 @@ export function usePostureSession(): PostureSession {
     setBestStreak(0);
     setCurrentSlouchDuration(0);
     setCurrentStreakDuration(0);
+    setIsSlouchingNow(false);
     allSessionDataRef.current = [];
     deltaBufferRef.current = [];
     minuteBucketsRef.current = [];
@@ -104,6 +102,9 @@ export function usePostureSession(): PostureSession {
     setSessionState("idle");
     setSessionStart(null);
     setSessionDuration(0);
+    setIsSlouchingNow(false);
+    setCurrentSlouchDuration(0);
+    setCurrentStreakDuration(0);
     allSessionDataRef.current = [];
     setLiveChartData([]);
     setRecentChartData([]);
@@ -122,12 +123,19 @@ export function usePostureSession(): PostureSession {
     return () => clearInterval(interval);
   }, [sessionState, sessionStart]);
 
+  // Track the last rawPitch we processed to detect new readings
+  const lastProcessedPitchRef = useRef<number | null>(null);
+
   // Process incoming data (only when running)
   useEffect(() => {
-    if (sessionState !== "running" || !isConnected || lastTimestamp === null)
-      return;
+    if (sessionState !== "running" || !serial.isConnected) return;
 
-    const isCurrentlySlouching = currentDelta > slouchThreshold;
+    // Only process if we have a new reading
+    if (serial.rawPitch === lastProcessedPitchRef.current) return;
+    lastProcessedPitchRef.current = serial.rawPitch;
+
+    const delta = serial.currentDelta;
+    const isCurrentlySlouching = delta > slouchThreshold;
     setIsSlouchingNow(isCurrentlySlouching);
 
     setTotalReadings((prev) => prev + 1);
@@ -145,8 +153,8 @@ export function usePostureSession(): PostureSession {
     }
     wasSlouchingRef.current = isCurrentlySlouching;
 
-    deltaBufferRef.current.push(currentDelta);
-  }, [currentDelta, lastTimestamp, isConnected, slouchThreshold, sessionState]);
+    deltaBufferRef.current.push(delta);
+  }, [serial.rawPitch, serial.currentDelta, serial.isConnected, slouchThreshold, sessionState]);
 
   // Update streaks (1Hz, only when running)
   useEffect(() => {
@@ -233,7 +241,7 @@ export function usePostureSession(): PostureSession {
     } else {
       setMinuteBuckets(completedBuckets);
     }
-  }, [sessionState, sessionDuration]);
+  }, [sessionState, sessionDuration, slouchThreshold]);
 
   // Fetch AI tip
   const fetchTip = useCallback(async () => {
@@ -259,7 +267,7 @@ export function usePostureSession(): PostureSession {
           messages: [
             {
               role: "user",
-              content: `You are SpineSync, a smart posture coach. The user has been slouching for ${currentSlouchDuration} seconds with a spine angle ${currentDelta.toFixed(1)}° off their baseline. Give one short actionable tip, max 15 words, no intro, direct and human.`,
+              content: `You are SpineSync, a smart posture coach. The user has been slouching for ${currentSlouchDuration} seconds with a spine angle ${serial.currentDelta.toFixed(1)}° off their baseline. Give one short actionable tip, max 15 words, no intro, direct and human.`,
             },
           ],
         }),
@@ -274,9 +282,10 @@ export function usePostureSession(): PostureSession {
       setIsFetchingTip(false);
       setLastTipFetchedAt(Date.now());
     }
-  }, [currentSlouchDuration, currentDelta]);
+  }, [currentSlouchDuration, serial.currentDelta]);
 
   useEffect(() => {
+    if (sessionState !== "running") return;
     if (currentSlouchDuration >= TIP_TRIGGER_DURATION) {
       const shouldFetch =
         lastTipFetchedAt === null || Date.now() - lastTipFetchedAt > 60000;
@@ -284,11 +293,7 @@ export function usePostureSession(): PostureSession {
         fetchTip();
       }
     }
-  }, [currentSlouchDuration, lastTipFetchedAt, isFetchingTip, fetchTip]);
-
-  const calibrate = useCallback(() => {
-    sendCalibrate();
-  }, [sendCalibrate]);
+  }, [sessionState, currentSlouchDuration, lastTipFetchedAt, isFetchingTip, fetchTip]);
 
   const goodPct =
     totalReadings > 0
@@ -296,27 +301,45 @@ export function usePostureSession(): PostureSession {
       : 100;
 
   return {
-    isConnected,
+    // Serial connection
+    isConnected: serial.isConnected,
+    connectSerial: serial.connect,
+    disconnectSerial: serial.disconnect,
+
+    // Session state
     sessionState,
     startSession,
     pauseSession,
     resumeSession,
     stopSession,
-    currentDelta,
+
+    // Live data
+    currentDelta: serial.currentDelta,
+    rawPitch: serial.rawPitch,
     isSlouchingNow,
     currentSlouchDuration,
     currentStreakDuration,
+
+    // Chart data
     liveChartData,
     recentChartData,
+
+    // Session stats
     sessionDuration,
     goodPct,
     alertCount,
     bestStreak,
+
+    // History
     minuteBuckets,
+
+    // AI coach
     currentTip,
     isFetchingTip,
     lastTipFetchedAt,
-    calibrate,
+
+    // Actions
+    calibrate: serial.calibrate,
     fetchTip,
   };
 }

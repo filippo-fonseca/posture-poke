@@ -18,12 +18,13 @@ const FART_SOUNDS = [
   "/audio/fart-squeak-03.mp3",
 ];
 
-const COOLDOWN = 15;
+const MAX_DELAY = 60; // stop incrementing once delay >= 60s
 
 interface UseVoiceAlertProps {
   isSlouchingNow: boolean;
   currentSlouchDuration: number;
   sessionDuration: number;
+  sessionRunning: boolean;
   onPunishment?: (marker: PunishmentMarker) => void;
 }
 
@@ -31,19 +32,49 @@ export function useVoiceAlert({
   isSlouchingNow,
   currentSlouchDuration,
   sessionDuration,
+  sessionRunning,
   onPunishment,
 }: UseVoiceAlertProps) {
   const { settings, punishmentDelay } = useSettings();
-  const lastPlayedRef = useRef<number>(0);
+
+  // How many punishments have fired in this slouch bout
+  const hitCountRef = useRef(0);
+  // Next threshold (in seconds of slouching) to trigger a punishment
+  const nextTriggerRef = useRef(0);
+  const wasSlouchingRef = useRef(false);
 
   useEffect(() => {
-    if (!isSlouchingNow || currentSlouchDuration < punishmentDelay) return;
+    if (!sessionRunning) return;
 
-    const now = Date.now();
-    if (now - lastPlayedRef.current < COOLDOWN * 1000) return;
+    // Reset when slouching stops
+    if (!isSlouchingNow) {
+      if (wasSlouchingRef.current) {
+        hitCountRef.current = 0;
+        nextTriggerRef.current = 0;
+      }
+      wasSlouchingRef.current = false;
+      return;
+    }
 
-    lastPlayedRef.current = now;
+    // Slouching just started — set first trigger
+    if (!wasSlouchingRef.current) {
+      wasSlouchingRef.current = true;
+      hitCountRef.current = 0;
+      nextTriggerRef.current = punishmentDelay;
+    }
 
+    // Not yet time
+    if (currentSlouchDuration < nextTriggerRef.current) return;
+
+    // Fire punishment
+    hitCountRef.current += 1;
+
+    // Schedule next: (hitCount+1) * delay, capped at 60s increments
+    const nextMultiplier = hitCountRef.current + 1;
+    const nextDelay = Math.min(nextMultiplier * punishmentDelay, MAX_DELAY);
+    nextTriggerRef.current = currentSlouchDuration + nextDelay;
+
+    // Play sound
     const isCoach =
       settings.instructionType === "coach" &&
       settings.coachAudioFiles.length > 0;
@@ -72,6 +103,7 @@ export function useVoiceAlert({
       });
     }
   }, [
+    sessionRunning,
     isSlouchingNow,
     currentSlouchDuration,
     sessionDuration,

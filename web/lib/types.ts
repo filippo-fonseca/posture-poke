@@ -1,12 +1,3 @@
-export interface PostureMessage {
-  delta: number;
-  timestamp: number;
-}
-
-export interface CalibrationCommand {
-  command: "calibrate";
-}
-
 export interface ChartDataPoint {
   time: string;
   delta: number;
@@ -62,8 +53,10 @@ export interface SessionSaveData {
 }
 
 export interface PostureSession {
-  // Connection
+  // Serial connection
   isConnected: boolean;
+  connectSerial: () => Promise<void>;
+  disconnectSerial: () => void;
 
   // Session state
   sessionState: SessionState;
@@ -74,6 +67,7 @@ export interface PostureSession {
 
   // Live data
   currentDelta: number;
+  rawPitch: number;
   isSlouchingNow: boolean;
   currentSlouchDuration: number;
   currentStreakDuration: number;
