@@ -9,6 +9,8 @@ Usage:
 """
 
 import argparse
+import asyncio
+import json
 import threading
 import time
 from datetime import datetime
@@ -16,7 +18,7 @@ from datetime import datetime
 import serial
 import serial.tools.list_ports
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 # ── Shared state ──────────────────────────────────────────────
@@ -29,6 +31,27 @@ latest_reading = {
 
 PITCH_THRESHOLD = 25.0
 ROLL_THRESHOLD = 20.0
+
+# Calibration baseline
+baseline_pitch = 0.0
+baseline_roll = 0.0
+
+
+# ── WebSocket Connection Manager ─────────────────────────────
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+
+manager = ConnectionManager()
 
 
 def find_arduino():
@@ -114,6 +137,47 @@ def get_tilt():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for real-time posture streaming."""
+    global baseline_pitch, baseline_roll
+    await manager.connect(websocket)
+
+    stream_task = None
+    try:
+        # Start streaming posture data
+        async def stream_data():
+            while True:
+                pitch = latest_reading["pitch"] - baseline_pitch
+                roll = latest_reading["roll"] - baseline_roll
+                delta = max(abs(pitch), abs(roll))
+
+                await websocket.send_json({
+                    "delta": round(delta, 2),
+                    "timestamp": int(time.time() * 1000),
+                })
+                await asyncio.sleep(0.1)  # 10Hz
+
+        stream_task = asyncio.create_task(stream_data())
+
+        # Listen for commands (e.g., calibration)
+        while True:
+            data = await websocket.receive_text()
+            try:
+                msg = json.loads(data)
+                if msg.get("command") == "calibrate":
+                    baseline_pitch = latest_reading["pitch"]
+                    baseline_roll = latest_reading["roll"]
+                    print("\n🎯 Calibrated baseline to current position")
+            except json.JSONDecodeError:
+                pass
+
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+        if stream_task:
+            stream_task.cancel()
 
 
 # ── Main ──────────────────────────────────────────────────────
