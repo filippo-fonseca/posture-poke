@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+  overscroll-behavior: none;
+}
+
+html {
+  overscroll-behavior: none;
+}
+
+:root {
+  --shimmer-base: #f4f4f5;
+  --shimmer-highlight: #e4e4e7;
+}
+
+.dark {
+  --shimmer-base: #27272a;
+  --shimmer-highlight: #3f3f46;
+}
+
+.recharts-tooltip-wrapper {
+  outline: none !important;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, var(--shimmer-base) 25%, var(--shimmer-highlight) 50%, var(--shimmer-base) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes spine-jitter {
+  0%, 100% { transform: translateY(0); }
+  15% { transform: translateY(-2px); }
+  30% { transform: translateY(3px); }
+  45% { transform: translateY(-1px); }
+  60% { transform: translateY(2px); }
+  75% { transform: translateY(-3px); }
+  90% { transform: translateY(1px); }
+}
+
+@keyframes spine-jitter-reverse {
+  0%, 100% { transform: translateY(0); }
+  15% { transform: translateY(2px); }
+  30% { transform: translateY(-3px); }
+  45% { transform: translateY(1px); }
+  60% { transform: translateY(-2px); }
+  75% { transform: translateY(3px); }
+  90% { transform: translateY(-1px); }
+}
+
+.animate-spine-jitter {
+  animation: spine-jitter 0.4s ease-in-out infinite;
+}
+
+.animate-spine-jitter-reverse {
+  animation: spine-jitter-reverse 0.4s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out;
+}
