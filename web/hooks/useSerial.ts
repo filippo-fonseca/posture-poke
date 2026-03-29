@@ -23,18 +23,16 @@ export function useSerial(): UseSerial {
 
   const portRef = useRef<SerialPort | null>(null);
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
   const lineBufferRef = useRef("");
-
+  const mountedRef = useRef(true);
   const lastPitchRef = useRef(0);
 
   const processLine = useCallback((line: string) => {
-    // Arduino sends "pitch,roll\n"
+    if (!mountedRef.current) return;
     const parts = line.split(",");
     if (parts.length < 2) return;
     const pitch = parseFloat(parts[0]);
     if (isNaN(pitch)) return;
-    // Dead zone: ignore changes smaller than 0.3° to filter sensor noise
     if (Math.abs(pitch - lastPitchRef.current) < 0.3) return;
     lastPitchRef.current = pitch;
     setRawPitch(pitch);
@@ -42,18 +40,17 @@ export function useSerial(): UseSerial {
 
   const readLoop = useCallback(async (port: SerialPort) => {
     const decoder = new TextDecoder();
-    while (port.readable) {
+    while (port.readable && mountedRef.current) {
       try {
         const reader = port.readable.getReader();
         readerRef.current = reader;
         while (true) {
           const { value, done } = await reader.read();
-          if (done) break;
+          if (done || !mountedRef.current) break;
           const chunk = decoder.decode(value, { stream: true });
           lineBufferRef.current += chunk;
 
           const lines = lineBufferRef.current.split("\n");
-          // Keep the last incomplete segment in the buffer
           lineBufferRef.current = lines.pop() ?? "";
           for (const line of lines) {
             const trimmed = line.trim();
@@ -61,31 +58,12 @@ export function useSerial(): UseSerial {
           }
         }
         reader.releaseLock();
-      } catch (err) {
-        // Reader was cancelled (disconnect) or port error
-        const msg = err instanceof Error ? err.message : "";
-        if (msg.includes("break") || msg.includes("cancel")) break;
-        // Port error — wait and retry
-        await new Promise((r) => setTimeout(r, 1000));
+      } catch {
+        break;
       }
     }
-    setIsConnected(false);
+    if (mountedRef.current) setIsConnected(false);
   }, [processLine]);
-
-  const connect = useCallback(async () => {
-    if (portRef.current) return;
-    try {
-      const port = await navigator.serial.requestPort();
-      await port.open({ baudRate: 115200 });
-      portRef.current = port;
-      abortRef.current = new AbortController();
-      setIsConnected(true);
-      lineBufferRef.current = "";
-      readLoop(port);
-    } catch {
-      // User cancelled the port picker or open failed
-    }
-  }, [readLoop]);
 
   const disconnect = useCallback(async () => {
     if (readerRef.current) {
@@ -96,17 +74,42 @@ export function useSerial(): UseSerial {
       try { await portRef.current.close(); } catch {}
       portRef.current = null;
     }
-    setIsConnected(false);
+    if (mountedRef.current) setIsConnected(false);
   }, []);
+
+  const connect = useCallback(async () => {
+    if (portRef.current) return;
+    try {
+      const port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 115200 });
+      portRef.current = port;
+      if (mountedRef.current) setIsConnected(true);
+      lineBufferRef.current = "";
+      readLoop(port);
+    } catch {
+      // User cancelled the port picker or open failed
+    }
+  }, [readLoop]);
 
   const calibrate = useCallback(() => {
     setBaseline(rawPitch);
   }, [rawPitch]);
 
-  // Cleanup on unmount
   useEffect(() => {
-    return () => { disconnect(); };
-  }, [disconnect]);
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      // Fire-and-forget cleanup — no state updates since we're unmounted
+      if (readerRef.current) {
+        readerRef.current.cancel().catch(() => {});
+        readerRef.current = null;
+      }
+      if (portRef.current) {
+        portRef.current.close().catch(() => {});
+        portRef.current = null;
+      }
+    };
+  }, []);
 
   const currentDelta = baseline !== null ? Math.abs(rawPitch - baseline) : Math.abs(rawPitch);
 

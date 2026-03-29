@@ -5,11 +5,25 @@ import { useAuth } from "@/lib/auth";
 
 interface HeaderProps {
   onSettingsClick?: () => void;
+  /** If true, sign-out will show a confirmation prompt */
+  sessionActive?: boolean;
+  onStopSession?: () => void;
 }
 
-export function Header({ onSettingsClick }: HeaderProps) {
+export function Header({ onSettingsClick, sessionActive, onStopSession }: HeaderProps) {
   const { theme, toggle } = useTheme();
   const { user, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    if (sessionActive) {
+      const ok = window.confirm(
+        "You have an active session. Signing out will lose your progress. Continue?"
+      );
+      if (!ok) return;
+      onStopSession?.();
+    }
+    await signOut();
+  };
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md">
@@ -51,7 +65,7 @@ export function Header({ onSettingsClick }: HeaderProps) {
 
             {user && (
               <button
-                onClick={signOut}
+                onClick={handleSignOut}
                 className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
               >
                 {user.photoURL ? (

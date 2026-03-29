@@ -1,6 +1,6 @@
 /*
   Posture Detector Firmware — Serial Version
-  
+
   Reads the BMI270 accelerometer, calculates pitch and roll,
   and sends tilt data over USB Serial as comma-separated values.
 */

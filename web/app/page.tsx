@@ -124,6 +124,16 @@ function DashboardContent() {
     fetchSessions();
   }, [fetchSessions]);
 
+  // Warn before closing/refreshing during an active session
+  useEffect(() => {
+    if (session.sessionState === "idle") return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [session.sessionState]);
+
   const handlePunishment = useCallback((marker: PunishmentMarker) => {
     punishmentMarkersRef.current.push(marker);
   }, []);
@@ -204,6 +214,8 @@ function DashboardContent() {
         onSettingsClick={() =>
           setView(view === "settings" ? "monitor" : "settings")
         }
+        sessionActive={session.sessionState !== "idle"}
+        onStopSession={() => session.stopSession()}
       />
 
       <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
@@ -334,37 +346,7 @@ function IdleView({
 
           {/* Right: last session mini chart + taunt */}
           {lastSession && lastSession.chartData?.length > 0 && (
-            <div className="flex-1 border-t sm:border-t-0 sm:border-l border-zinc-200 dark:border-zinc-800 p-5 flex flex-col justify-center">
-              <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
-                Can you do better than last time?
-              </p>
-              <div className="h-[80px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={lastSession.chartData}
-                    margin={{ top: 2, right: 2, left: 2, bottom: 2 }}
-                  >
-                    <defs>
-                      <linearGradient id="idleMini" x1="0" y1="0" x2="0" y2="1">
-                        <stop key="m0" offset="0%" stopColor={lastSession.goodPct >= 70 ? "#22c55e" : lastSession.goodPct >= 40 ? "#f59e0b" : "#ef4444"} stopOpacity={0.3} />
-                        <stop key="m1" offset="100%" stopColor={lastSession.goodPct >= 70 ? "#22c55e" : lastSession.goodPct >= 40 ? "#f59e0b" : "#ef4444"} stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <Area
-                      type="monotone"
-                      dataKey="delta"
-                      stroke={lastSession.goodPct >= 70 ? "#22c55e" : lastSession.goodPct >= 40 ? "#f59e0b" : "#ef4444"}
-                      strokeWidth={1.5}
-                      fill="url(#idleMini)"
-                      isAnimationActive={false}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-              <p className="mt-1 text-[10px] text-zinc-400 dark:text-zinc-500 text-right">
-                {formatDuration(lastSession.durationSeconds)} &middot; {formatDate(lastSession.endedAt)}
-              </p>
-            </div>
+            <MiniSessionChart session={lastSession} />
           )}
         </div>
       </div>
@@ -437,6 +419,58 @@ function IdleView({
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function MiniSessionChart({ session: s }: { session: SessionDoc }) {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const threshold = s.slouchThreshold ?? 20;
+  const greenStop = `${(1 - threshold / 50) * 100}%`;
+  const amberStop = `${(1 - Math.min(threshold + 15, 50) / 50) * 100}%`;
+
+  return (
+    <div className="flex-1 border-t sm:border-t-0 sm:border-l border-zinc-200 dark:border-zinc-800 p-5 flex flex-col justify-center">
+      <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
+        Can you do better than last time?
+      </p>
+      <div className="h-[80px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart
+            data={s.chartData}
+            margin={{ top: 2, right: 2, left: 2, bottom: 2 }}
+          >
+            <defs>
+              <linearGradient id="idleMiniFill" x1="0" y1="0" x2="0" y2="80" gradientUnits="userSpaceOnUse">
+                <stop key="f0" offset="0%" stopColor="#ef4444" stopOpacity={isDark ? 0.2 : 0.1} />
+                <stop key="f1" offset={greenStop} stopColor="#ef4444" stopOpacity={0.02} />
+                <stop key="f2" offset={greenStop} stopColor="#22c55e" stopOpacity={0.02} />
+                <stop key="f3" offset="100%" stopColor="#22c55e" stopOpacity={isDark ? 0.2 : 0.1} />
+              </linearGradient>
+              <linearGradient id="idleMiniStroke" x1="0" y1="0" x2="0" y2="80" gradientUnits="userSpaceOnUse">
+                <stop key="s0" offset="0%" stopColor="#ef4444" />
+                <stop key="s1" offset={amberStop} stopColor="#ef4444" />
+                <stop key="s2" offset={amberStop} stopColor="#f59e0b" />
+                <stop key="s3" offset={greenStop} stopColor="#f59e0b" />
+                <stop key="s4" offset={greenStop} stopColor="#22c55e" />
+                <stop key="s5" offset="100%" stopColor="#22c55e" />
+              </linearGradient>
+            </defs>
+            <Area
+              type="monotone"
+              dataKey="delta"
+              stroke="url(#idleMiniStroke)"
+              strokeWidth={1.5}
+              fill="url(#idleMiniFill)"
+              isAnimationActive={false}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="mt-1 text-[10px] text-zinc-400 dark:text-zinc-500 text-right">
+        {formatDuration(s.durationSeconds)} &middot; {formatDate(s.endedAt)}
+      </p>
     </div>
   );
 }
