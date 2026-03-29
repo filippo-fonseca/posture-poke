@@ -61,8 +61,8 @@ const punishments = [
         <path d="M12 2L12 22" /><path d="M5 12l7-10 7 10" /><circle cx="12" cy="22" r="0" />
       </svg>
     ),
-    title: "The Needle",
-    description: "A tiny servo-powered needle gives you a gentle poke. Real hardware. Real motivation. Real consequences.",
+    title: "The Poker",
+    description: "A tiny servo-powered poker gives you a gentle poke. Real hardware. Real motivation. Real consequences.",
     severity: "Nuclear",
     color: "red",
   },
@@ -357,7 +357,7 @@ export default function Landing() {
               {
                 step: "02",
                 title: "Set your consequences",
-                desc: "Choose what happens when you slouch — from beeps to an AI-generated voice coach to... the needle.",
+                desc: "Choose what happens when you slouch — from beeps to an AI-generated voice coach to... the poker.",
               },
               {
                 step: "03",

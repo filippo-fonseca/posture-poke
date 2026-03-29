@@ -18,7 +18,9 @@ const FART_SOUNDS = [
   "/audio/fart-squeak-03.mp3",
 ];
 
-const MAX_DELAY = 60; // stop incrementing once delay >= 60s
+const BEEP_SOUNDS = ["/audio/beep-01.mp3"];
+
+const MAX_DELAY = 60;
 
 interface UseVoiceAlertProps {
   isSlouchingNow: boolean;
@@ -39,14 +41,13 @@ export function useVoiceAlert({
 }: UseVoiceAlertProps) {
   const { settings, punishmentDelay } = useSettings();
 
-  // How many punishments have fired in this slouch bout
   const hitCountRef = useRef(0);
   const nextTriggerRef = useRef(0);
   const wasSlouchingRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    if (!sessionRunning) return;
+    if (!sessionRunning || !settings.punishmentsEnabled) return;
 
     // Reset when slouching stops
     if (!isSlouchingNow) {
@@ -58,20 +59,17 @@ export function useVoiceAlert({
       return;
     }
 
-    // Slouching just started — set first trigger
+    // Slouching just started
     if (!wasSlouchingRef.current) {
       wasSlouchingRef.current = true;
       hitCountRef.current = 0;
       nextTriggerRef.current = punishmentDelay;
     }
 
-    // Not yet time
     if (currentSlouchDuration < nextTriggerRef.current) return;
 
     // Fire punishment
     hitCountRef.current += 1;
-
-    // Schedule next: (hitCount+1) * delay, capped at 60s increments
     const nextMultiplier = hitCountRef.current + 1;
     const nextDelay = Math.min(nextMultiplier * punishmentDelay, MAX_DELAY);
     nextTriggerRef.current = currentSlouchDuration + nextDelay;
@@ -81,28 +79,39 @@ export function useVoiceAlert({
       return;
     }
 
-    // Play sound
-    const isCoach =
-      settings.instructionType === "coach" &&
-      settings.coachAudioFiles.length > 0;
+    // Build pool of available sounds from enabled audio punishments
+    const audioPunishments = settings.audioPunishments ?? [];
+    const soundPool: string[] = [];
+    let punishmentType: "fart" | "coach" = "fart";
 
-    let soundUrl: string;
-    if (isCoach) {
-      const file =
-        settings.coachAudioFiles[
-          Math.floor(Math.random() * settings.coachAudioFiles.length)
-        ];
-      soundUrl = `/audio/${file}`;
-    } else {
-      soundUrl = FART_SOUNDS[Math.floor(Math.random() * FART_SOUNDS.length)];
+    for (const type of audioPunishments) {
+      if (type === "beep") {
+        soundPool.push(...BEEP_SOUNDS);
+      } else if (type === "farts") {
+        soundPool.push(...FART_SOUNDS);
+      } else if (type === "coach" && settings.coachAudioFiles.length > 0) {
+        soundPool.push(
+          ...settings.coachAudioFiles.map((f) => `/audio/${f}`)
+        );
+      }
     }
 
-    const audio = new Audio(soundUrl);
-    audioRef.current = audio;
-    audio.play().catch(() => {});
+    // Play a random sound from the pool
+    if (soundPool.length > 0) {
+      const soundUrl = soundPool[Math.floor(Math.random() * soundPool.length)];
+      // Determine type for the marker
+      if (soundUrl.includes("fart")) punishmentType = "fart";
+      else punishmentType = "coach";
 
-    // Trigger the needle
-    onPoke?.();
+      const audio = new Audio(soundUrl);
+      audioRef.current = audio;
+      audio.play().catch(() => {});
+    }
+
+    // Trigger the poker if enabled
+    if (settings.pokeEnabled) {
+      onPoke?.();
+    }
 
     if (onPunishment) {
       const minutes = Math.floor(sessionDuration / 60);
@@ -110,7 +119,7 @@ export function useVoiceAlert({
       onPunishment({
         time: `${minutes}:${seconds.toString().padStart(2, "0")}`,
         secondsIn: sessionDuration,
-        type: isCoach ? "coach" : "fart",
+        type: punishmentType,
       });
     }
   }, [
@@ -119,7 +128,9 @@ export function useVoiceAlert({
     currentSlouchDuration,
     sessionDuration,
     punishmentDelay,
-    settings.instructionType,
+    settings.punishmentsEnabled,
+    settings.pokeEnabled,
+    settings.audioPunishments,
     settings.coachAudioFiles,
     onPunishment,
     onPoke,

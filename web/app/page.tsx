@@ -195,6 +195,8 @@ function DashboardContent() {
         alertCount: data.alertCount,
         bestStreak: data.bestStreak,
         slouchThreshold,
+        strictness: settings.strictness,
+        harshness: settings.harshness,
         instructionType: settings.instructionType,
         coachId: settings.activeCoachId ?? null,
         chartData: data.allChartData,
@@ -211,6 +213,9 @@ function DashboardContent() {
     activeCoachId: string | null;
     activeCoachOwnerUid: string | null;
     coachAudioFiles: string[];
+    punishmentsEnabled: boolean;
+    pokeEnabled: boolean;
+    audioPunishments: import("@/lib/settings").AudioPunishment[];
   }) => {
     update(cfg);
     setModalStep("calibrate");
@@ -754,7 +759,7 @@ function ShareModal({
   const durationStr = `${mins}m ${secs}s`;
 
   const shareText = `I just completed a PosturePoke session! ${summary.goodPct}% good posture over ${durationStr}. Can you beat that? #PosturePoke`;
-  const linkedInText = `I'm thrilled to announce that after ${durationStr} of relentless dedication, I have achieved a ${summary.goodPct}% good posture score. This wouldn't have been possible without my spine, my chair, and a small device that pokes me with a needle when I slouch. Grateful for the journey. #PosturePoke #OpenToWork #Posture #Wellness #Leadership`;
+  const linkedInText = `I'm thrilled to announce that after ${durationStr} of relentless dedication, I have achieved a ${summary.goodPct}% good posture score. This wouldn't have been possible without my spine, my chair, and a small device that pokes me when I slouch. Grateful for the journey. #PosturePoke #OpenToWork #Posture #Wellness #Leadership`;
   const encodedText = encodeURIComponent(shareText);
   const encodedLinkedIn = encodeURIComponent(linkedInText);
   const url = encodeURIComponent("https://posturepoke.com");
@@ -905,11 +910,18 @@ function SessionDetailModal({
     });
   }, [user, sessionId]);
 
+  const strictnessLabel = session?.strictness != null
+    ? STRICTNESS_LEVELS[session.strictness]?.name ?? null
+    : null;
+  const harshnessLabel = session?.harshness != null
+    ? HARSHNESS_LEVELS[session.harshness]?.name ?? null
+    : null;
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-8 overflow-y-auto">
-      <div className="w-full max-w-3xl rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-xl">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-10">
+      <div className="w-full max-w-3xl max-h-[calc(100vh-5rem)] flex flex-col rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 px-6 py-4 shrink-0">
           <h2 className="text-lg font-bold">
             {loading ? (
               <span className="shimmer inline-block h-5 w-40 rounded" />
@@ -923,23 +935,14 @@ function SessionDetailModal({
             onClick={onClose}
             className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Body */}
-        <div className="p-6 space-y-6">
+        {/* Body — scrollable */}
+        <div className="p-6 space-y-6 overflow-y-auto">
           {loading ? (
             <>
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -951,6 +954,27 @@ function SessionDetailModal({
             </>
           ) : session ? (
             <>
+              {/* Session parameters */}
+              <div className="flex flex-wrap gap-2">
+                <span className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1 text-[11px] text-zinc-600 dark:text-zinc-400">
+                  Threshold: {session.slouchThreshold}&deg;
+                  {strictnessLabel && ` (${strictnessLabel})`}
+                </span>
+                {harshnessLabel && (
+                  <span className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1 text-[11px] text-zinc-600 dark:text-zinc-400">
+                    Harshness: {harshnessLabel}
+                  </span>
+                )}
+                <span className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1 text-[11px] text-zinc-600 dark:text-zinc-400">
+                  Punishment: {session.instructionType === "coach" ? "Coach" : "Farts"}
+                </span>
+                {session.avgDeviation != null && (
+                  <span className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1 text-[11px] text-zinc-600 dark:text-zinc-400">
+                    Avg deviation: {session.avgDeviation.toFixed(1)}&deg;
+                  </span>
+                )}
+              </div>
+
               <StatsRow
                 goodPct={session.goodPct}
                 alertCount={session.alertCount}
@@ -1717,6 +1741,9 @@ function ConfigModal({
     activeCoachId: string | null;
     activeCoachOwnerUid: string | null;
     coachAudioFiles: string[];
+    punishmentsEnabled: boolean;
+    pokeEnabled: boolean;
+    audioPunishments: import("@/lib/settings").AudioPunishment[];
   }) => void;
   onCancel: () => void;
 }) {
@@ -1727,378 +1754,314 @@ function ConfigModal({
     "border-orange-500 bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400",
     "border-red-500 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400",
   ];
+
+  type SessionMode = "punishments" | "scared";
+  type AudioType = "beep" | "farts" | "coach";
+
+  const [mode, setMode] = useState<SessionMode>("punishments");
   const [strictness, setStrictness] = useState(defaults.strictness);
   const [harshness, setHarshness] = useState(defaults.harshness);
-  const [instructionType, setInstructionType] = useState<InstructionType>(
-    defaults.instructionType,
-  );
-  const [selectedCoachId, setSelectedCoachId] = useState<string | null>(
-    defaults.activeCoachId,
-  );
-  const [selectedCoachOwnerUid, setSelectedCoachOwnerUid] = useState<
-    string | null
-  >(null);
+  const [pokeEnabled, setPokeEnabled] = useState(false);
+  const [audioTypes, setAudioTypes] = useState<Set<AudioType>>(new Set(["farts"]));
+  const [selectedCoachId, setSelectedCoachId] = useState<string | null>(defaults.activeCoachId);
+  const [selectedCoachOwnerUid, setSelectedCoachOwnerUid] = useState<string | null>(null);
+
   const { coaches, loading: coachesLoading } = useCoaches();
   const { friends } = useFriends();
 
   // Load friend coaches
-  const [friendCoaches, setFriendCoaches] = useState<
-    { friend: FriendProfile; coaches: CoachDoc[] }[]
-  >([]);
+  const [friendCoaches, setFriendCoaches] = useState<{ friend: FriendProfile; coaches: CoachDoc[] }[]>([]);
   useEffect(() => {
-    if (friends.length === 0) {
-      setFriendCoaches([]);
-      return;
-    }
+    if (friends.length === 0) { setFriendCoaches([]); return; }
     const db = getFirebaseDb();
     Promise.all(
       friends.map(async (f) => {
         try {
-          const q = query(
-            collection(db, "users", f.uid, "coaches"),
-            orderBy("createdAt", "desc"),
-          );
+          const q = query(collection(db, "users", f.uid, "coaches"), orderBy("createdAt", "desc"));
           const snap = await getDocs(q);
-          const fCoaches = snap.docs.map(
-            (d) => ({ id: d.id, ...d.data() }) as CoachDoc,
-          );
+          const fCoaches = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as CoachDoc);
           return fCoaches.length > 0 ? { friend: f, coaches: fCoaches } : null;
-        } catch {
-          return null;
-        }
-      }),
-    ).then((results) =>
-      setFriendCoaches(
-        results.filter(
-          (r): r is { friend: FriendProfile; coaches: CoachDoc[] } =>
-            r !== null,
-        ),
-      ),
-    );
+        } catch { return null; }
+      })
+    ).then((results) => setFriendCoaches(results.filter((r): r is { friend: FriendProfile; coaches: CoachDoc[] } => r !== null)));
   }, [friends]);
 
   const allCoaches = [
-    ...coaches.map((c) => ({
-      ...c,
-      ownerUid: null as string | null,
-      ownerName: null as string | null,
-    })),
+    ...coaches.map((c) => ({ ...c, ownerUid: null as string | null })),
     ...friendCoaches.flatMap(({ friend, coaches: fc }) =>
-      fc.map((c) => ({
-        ...c,
-        ownerUid: friend.uid,
-        ownerName: friend.displayName,
-      })),
+      fc.map((c) => ({ ...c, ownerUid: friend.uid }))
     ),
   ];
   const selectedCoach = allCoaches.find((c) => c.id === selectedCoachId);
-  const canProceed =
-    isConnected &&
-    (instructionType === "farts" ||
-      (instructionType === "coach" && selectedCoach != null));
+
+  const toggleAudio = (type: AudioType) => {
+    setAudioTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  };
+
+  const hasAnyPunishment = pokeEnabled || audioTypes.size > 0;
+  const needsCoach = audioTypes.has("coach") && !selectedCoach;
+  const canProceed = isConnected && (mode === "scared" || (hasAnyPunishment && !needsCoach));
+
+  const handleNext = () => {
+    if (mode === "scared") {
+      onNext({
+        strictness,
+        harshness: 0,
+        instructionType: "farts",
+        activeCoachId: null,
+        activeCoachOwnerUid: null,
+        coachAudioFiles: [],
+        punishmentsEnabled: false,
+        pokeEnabled: false,
+        audioPunishments: [],
+      });
+      return;
+    }
+    // Determine instructionType for backwards compat
+    const audioPunishments = Array.from(audioTypes);
+    const instructionType: InstructionType = audioTypes.has("coach") ? "coach" : "farts";
+    onNext({
+      strictness,
+      harshness,
+      instructionType,
+      activeCoachId: audioTypes.has("coach") ? selectedCoachId : null,
+      activeCoachOwnerUid: audioTypes.has("coach") ? selectedCoachOwnerUid : null,
+      coachAudioFiles: audioTypes.has("coach") && selectedCoach ? selectedCoach.audioFiles : [],
+      punishmentsEnabled: true,
+      pokeEnabled,
+      audioPunishments,
+    });
+  };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 overflow-y-auto py-8">
-      <div className="w-full max-w-lg rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-xl">
-        <h2 className="text-lg font-bold mb-1">New Session</h2>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-6">
-          Configure your session parameters.
-        </p>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-8">
+      <div className="w-full max-w-lg max-h-[calc(100vh-4rem)] flex flex-col rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-xl">
+        <div className="p-6 pb-0 shrink-0">
+          <h2 className="text-lg font-bold mb-1">New Session</h2>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
+            Configure your session parameters.
+          </p>
 
-        <div className="mb-5">
-          <label className="text-sm font-medium mb-2 block">Strictness</label>
-          <div className="grid grid-cols-5 gap-1.5">
-            {STRICTNESS_LEVELS.map((level, i) => (
-              <button
-                key={level.name}
-                onClick={() => setStrictness(i)}
-                className={`rounded-lg border px-1.5 py-2 text-center transition-colors ${
-                  strictness === i
-                    ? DIFFICULTY_COLORS[i]
-                    : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700"
-                }`}
-              >
-                <span className="block text-[10px] sm:text-[11px] font-medium leading-tight">
-                  {level.name}
-                </span>
-                <span className="block text-[9px] sm:text-[10px] mt-0.5 opacity-60">
-                  {level.description}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="mb-5">
-          <label className="text-sm font-medium mb-2 block">Harshness</label>
-          <div className="grid grid-cols-5 gap-1.5">
-            {HARSHNESS_LEVELS.map((level, i) => (
-              <button
-                key={level.name}
-                onClick={() => setHarshness(i)}
-                className={`rounded-lg border px-1.5 py-2 text-center transition-colors ${
-                  harshness === i
-                    ? DIFFICULTY_COLORS[i]
-                    : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700"
-                }`}
-              >
-                <span className="block text-[10px] sm:text-[11px] font-medium leading-tight">
-                  {level.name}
-                </span>
-                <span className="block text-[9px] sm:text-[10px] mt-0.5 opacity-60">
-                  {level.description}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="mb-5">
-          <div className="flex items-center gap-2 mb-2">
-            <label className="text-sm font-medium">Punishment</label>
+          {/* Mode toggle */}
+          <div className="grid grid-cols-2 gap-2 mb-5">
             <button
-              type="button"
-              onClick={() =>
-                setInstructionType(Math.random() < 0.5 ? "farts" : "coach")
-              }
-              className="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
-              title="Randomize"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <rect x="2" y="2" width="20" height="20" rx="3" />
-                <circle
-                  cx="8"
-                  cy="8"
-                  r="1.5"
-                  fill="currentColor"
-                  stroke="none"
-                />
-                <circle
-                  cx="16"
-                  cy="8"
-                  r="1.5"
-                  fill="currentColor"
-                  stroke="none"
-                />
-                <circle
-                  cx="8"
-                  cy="16"
-                  r="1.5"
-                  fill="currentColor"
-                  stroke="none"
-                />
-                <circle
-                  cx="16"
-                  cy="16"
-                  r="1.5"
-                  fill="currentColor"
-                  stroke="none"
-                />
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="1.5"
-                  fill="currentColor"
-                  stroke="none"
-                />
-              </svg>
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => setInstructionType("farts")}
-              className={`rounded-lg border p-3 text-left transition-colors ${
-                instructionType === "farts"
-                  ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30"
-                  : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
+              onClick={() => setMode("punishments")}
+              className={`rounded-lg border p-3 text-center transition-colors ${
+                mode === "punishments"
+                  ? "border-red-500 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400"
+                  : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700"
               }`}
             >
-              <span className="block text-sm font-medium">Fart Sounds</span>
-              <span className="block text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                Embarrassing audio cues
-              </span>
+              <span className="block text-sm font-medium">Punishments</span>
             </button>
             <button
-              onClick={() => setInstructionType("coach")}
-              className={`rounded-lg border p-3 text-left transition-colors ${
-                instructionType === "coach"
-                  ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30"
-                  : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
+              onClick={() => setMode("scared")}
+              className={`rounded-lg border p-3 text-center transition-colors ${
+                mode === "scared"
+                  ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400"
+                  : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700"
               }`}
             >
-              <span className="block text-sm font-medium">Coach Voice</span>
-              <span className="block text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                AI roasts your posture
-              </span>
+              <span className="block text-sm font-medium">I&apos;m scared</span>
             </button>
           </div>
         </div>
 
-        {instructionType === "coach" && (
-          <div className="mb-5">
-            <div className="flex items-center gap-2 mb-2">
-              <label className="text-sm font-medium">Select Coach</label>
-              {coaches.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const others = coaches.filter(
-                      (c) => c.id !== selectedCoachId,
-                    );
-                    if (others.length > 0) {
-                      setSelectedCoachId(
-                        others[Math.floor(Math.random() * others.length)].id ??
-                          null,
-                      );
-                    }
-                  }}
-                  className="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
-                  title="Random coach"
-                >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <rect x="2" y="2" width="20" height="20" rx="3" />
-                    <circle
-                      cx="8"
-                      cy="8"
-                      r="1.5"
-                      fill="currentColor"
-                      stroke="none"
-                    />
-                    <circle
-                      cx="16"
-                      cy="8"
-                      r="1.5"
-                      fill="currentColor"
-                      stroke="none"
-                    />
-                    <circle
-                      cx="8"
-                      cy="16"
-                      r="1.5"
-                      fill="currentColor"
-                      stroke="none"
-                    />
-                    <circle
-                      cx="16"
-                      cy="16"
-                      r="1.5"
-                      fill="currentColor"
-                      stroke="none"
-                    />
-                    <circle
-                      cx="12"
-                      cy="12"
-                      r="1.5"
-                      fill="currentColor"
-                      stroke="none"
-                    />
-                  </svg>
-                </button>
-              )}
-            </div>
-            {coachesLoading ? (
-              <div className="shimmer h-12 w-full rounded-lg" />
-            ) : allCoaches.length === 0 ? (
-              <p className="text-xs text-zinc-400 dark:text-zinc-500 py-3">
-                No coaches yet. Create one from the settings panel (gear icon).
+        <div className="px-6 pb-6 overflow-y-auto">
+          {mode === "scared" ? (
+            <div className="py-8 text-center">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 italic">
+                You&apos;d better have a good excuse.
               </p>
-            ) : (
-              <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                {coaches.length > 0 && (
-                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium uppercase tracking-wide">
-                    Your Coaches
-                  </p>
-                )}
-                {coaches.map((coach) => (
-                  <div key={coach.id} className="flex items-center gap-1">
+              <div className="mt-4">
+                <label className="text-sm font-medium mb-2 block text-left">Strictness</label>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {STRICTNESS_LEVELS.map((level, i) => (
                     <button
-                      onClick={() => {
-                        setSelectedCoachId(coach.id ?? null);
-                        setSelectedCoachOwnerUid(null);
-                      }}
-                      className={`flex-1 rounded-lg border p-2.5 text-left transition-colors ${
-                        selectedCoachId === coach.id
-                          ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20"
-                          : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
+                      key={level.name}
+                      onClick={() => setStrictness(i)}
+                      className={`rounded-lg border px-1.5 py-2 text-center transition-colors ${
+                        strictness === i
+                          ? DIFFICULTY_COLORS[i]
+                          : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700"
                       }`}
                     >
-                      <span className="block text-sm leading-snug">
-                        {coach.description}
-                      </span>
+                      <span className="block text-[10px] sm:text-[11px] font-medium leading-tight">{level.name}</span>
+                      <span className="block text-[9px] sm:text-[10px] mt-0.5 opacity-60">{level.description}</span>
                     </button>
-                    <CoachPreviewButton coach={coach} />
-                  </div>
-                ))}
-                {friendCoaches.map(({ friend, coaches: fc }) => (
-                  <div key={friend.uid}>
-                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium uppercase tracking-wide mt-2">
-                      {friend.displayName}&apos;s Coaches
-                    </p>
-                    {fc.map((coach) => (
-                      <div
-                        key={coach.id}
-                        className="flex items-center gap-1 mt-1.5"
-                      >
-                        <button
-                          onClick={() => {
-                            setSelectedCoachId(coach.id ?? null);
-                            setSelectedCoachOwnerUid(friend.uid);
-                          }}
-                          className={`flex-1 rounded-lg border p-2.5 text-left transition-colors ${
-                            selectedCoachId === coach.id
-                              ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20"
-                              : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
-                          }`}
-                        >
-                          <span className="block text-sm leading-snug">
-                            {coach.description}
-                          </span>
-                        </button>
-                        <CoachPreviewButton coach={coach} />
-                      </div>
-                    ))}
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          ) : (
+            <>
+              <div className="mb-5">
+                <label className="text-sm font-medium mb-2 block">Strictness</label>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {STRICTNESS_LEVELS.map((level, i) => (
+                    <button
+                      key={level.name}
+                      onClick={() => setStrictness(i)}
+                      className={`rounded-lg border px-1.5 py-2 text-center transition-colors ${
+                        strictness === i
+                          ? DIFFICULTY_COLORS[i]
+                          : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700"
+                      }`}
+                    >
+                      <span className="block text-[10px] sm:text-[11px] font-medium leading-tight">{level.name}</span>
+                      <span className="block text-[9px] sm:text-[10px] mt-0.5 opacity-60">{level.description}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-        <div className="flex items-center gap-3 pt-2">
+              <div className="mb-5">
+                <label className="text-sm font-medium mb-2 block">Harshness</label>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {HARSHNESS_LEVELS.map((level, i) => (
+                    <button
+                      key={level.name}
+                      onClick={() => setHarshness(i)}
+                      className={`rounded-lg border px-1.5 py-2 text-center transition-colors ${
+                        harshness === i
+                          ? DIFFICULTY_COLORS[i]
+                          : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700"
+                      }`}
+                    >
+                      <span className="block text-[10px] sm:text-[11px] font-medium leading-tight">{level.name}</span>
+                      <span className="block text-[9px] sm:text-[10px] mt-0.5 opacity-60">{level.description}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Poke toggle */}
+              <div className="mb-5">
+                <button
+                  onClick={() => setPokeEnabled(!pokeEnabled)}
+                  className={`w-full rounded-lg border p-3 text-left transition-colors ${
+                    pokeEnabled
+                      ? "border-red-500 bg-red-50 dark:bg-red-950/30"
+                      : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
+                  }`}
+                >
+                  <span className={`block text-sm font-medium ${pokeEnabled ? "text-red-700 dark:text-red-400" : ""}`}>
+                    The Poker
+                  </span>
+                  <span className="block text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Servo-powered poke when you slouch
+                  </span>
+                </button>
+              </div>
+
+              {/* Audio punishments */}
+              <div className="mb-5">
+                <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-2 block uppercase tracking-wide">Audio</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => toggleAudio("beep")}
+                    className={`rounded-lg border p-3 text-left transition-colors ${
+                      audioTypes.has("beep")
+                        ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30"
+                        : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
+                    }`}
+                  >
+                    <span className="block text-sm font-medium">Beep</span>
+                    <span className="block text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">Simple tone</span>
+                  </button>
+                  <button
+                    onClick={() => toggleAudio("farts")}
+                    className={`rounded-lg border p-3 text-left transition-colors ${
+                      audioTypes.has("farts")
+                        ? "border-orange-500 bg-orange-50 dark:bg-orange-950/30"
+                        : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
+                    }`}
+                  >
+                    <span className="block text-sm font-medium">Farts</span>
+                    <span className="block text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">Embarrassing</span>
+                  </button>
+                  <button
+                    onClick={() => toggleAudio("coach")}
+                    className={`rounded-lg border p-3 text-left transition-colors ${
+                      audioTypes.has("coach")
+                        ? "border-red-500 bg-red-50 dark:bg-red-950/30"
+                        : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
+                    }`}
+                  >
+                    <span className="block text-sm font-medium">Coach</span>
+                    <span className="block text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">AI roasts you</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Coach selection (only if coach audio selected) */}
+              {audioTypes.has("coach") && (
+                <div className="mb-5">
+                  <label className="text-sm font-medium mb-2 block">Select Coach</label>
+                  {coachesLoading ? (
+                    <div className="shimmer h-12 w-full rounded-lg" />
+                  ) : allCoaches.length === 0 ? (
+                    <p className="text-xs text-zinc-400 dark:text-zinc-500 py-3">
+                      No coaches yet. Create one from the settings panel.
+                    </p>
+                  ) : (
+                    <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                      {coaches.length > 0 && (
+                        <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium uppercase tracking-wide">Your Coaches</p>
+                      )}
+                      {coaches.map((coach) => (
+                        <div key={coach.id} className="flex items-center gap-1">
+                          <button
+                            onClick={() => { setSelectedCoachId(coach.id ?? null); setSelectedCoachOwnerUid(null); }}
+                            className={`flex-1 rounded-lg border p-2.5 text-left transition-colors ${
+                              selectedCoachId === coach.id
+                                ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20"
+                                : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
+                            }`}
+                          >
+                            <span className="block text-sm leading-snug">{coach.description}</span>
+                          </button>
+                          <CoachPreviewButton coach={coach} />
+                        </div>
+                      ))}
+                      {friendCoaches.map(({ friend, coaches: fc }) => (
+                        <div key={friend.uid}>
+                          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium uppercase tracking-wide mt-2">
+                            {friend.displayName}&apos;s Coaches
+                          </p>
+                          {fc.map((coach) => (
+                            <div key={coach.id} className="flex items-center gap-1 mt-1.5">
+                              <button
+                                onClick={() => { setSelectedCoachId(coach.id ?? null); setSelectedCoachOwnerUid(friend.uid); }}
+                                className={`flex-1 rounded-lg border p-2.5 text-left transition-colors ${
+                                  selectedCoachId === coach.id
+                                    ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20"
+                                    : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
+                                }`}
+                              >
+                                <span className="block text-sm leading-snug">{coach.description}</span>
+                              </button>
+                              <CoachPreviewButton coach={coach} />
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3 px-6 pb-6 pt-2 shrink-0">
           <button
-            onClick={() =>
-              onNext({
-                strictness,
-                harshness,
-                instructionType,
-                activeCoachId:
-                  instructionType === "coach" ? selectedCoachId : null,
-                activeCoachOwnerUid:
-                  instructionType === "coach" ? selectedCoachOwnerUid : null,
-                coachAudioFiles:
-                  instructionType === "coach" && selectedCoach
-                    ? selectedCoach.audioFiles
-                    : [],
-              })
-            }
+            onClick={handleNext}
             disabled={!canProceed}
             className="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-40"
           >

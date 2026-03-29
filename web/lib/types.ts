@@ -36,6 +36,8 @@ export interface SessionDoc {
   alertCount: number;
   bestStreak: number;
   slouchThreshold: number;
+  strictness?: number;
+  harshness?: number;
   instructionType: "farts" | "coach";
   coachId: string | null;
   chartData: ChartDataPoint[];

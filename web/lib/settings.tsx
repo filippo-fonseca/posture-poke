@@ -30,11 +30,15 @@ export const HARSHNESS_LEVELS = [
 ];
 
 export type InstructionType = "farts" | "coach";
+export type AudioPunishment = "beep" | "farts" | "coach";
 
 export interface Settings {
   strictness: number;
   harshness: number;
   instructionType: InstructionType;
+  punishmentsEnabled: boolean;
+  pokeEnabled: boolean;
+  audioPunishments: AudioPunishment[];
   activeCoachId: string | null;
   activeCoachOwnerUid: string | null;
   coachAudioFiles: string[];
@@ -44,6 +48,9 @@ const DEFAULT_SETTINGS: Settings = {
   strictness: 2,
   harshness: 2,
   instructionType: "farts",
+  punishmentsEnabled: true,
+  pokeEnabled: false,
+  audioPunishments: ["farts"],
   activeCoachId: null,
   activeCoachOwnerUid: null,
   coachAudioFiles: [],
@@ -101,6 +108,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           strictness: data.strictness ?? DEFAULT_SETTINGS.strictness,
           harshness: data.harshness ?? DEFAULT_SETTINGS.harshness,
           instructionType: data.instructionType ?? DEFAULT_SETTINGS.instructionType,
+          punishmentsEnabled: data.punishmentsEnabled ?? DEFAULT_SETTINGS.punishmentsEnabled,
+          pokeEnabled: data.pokeEnabled ?? DEFAULT_SETTINGS.pokeEnabled,
+          audioPunishments: data.audioPunishments ?? DEFAULT_SETTINGS.audioPunishments,
           activeCoachId: data.activeCoachId ?? null,
           activeCoachOwnerUid: ownerUid,
           coachAudioFiles: [],
@@ -147,6 +157,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           if ("instructionType" in partial) firestoreFields.instructionType = partial.instructionType;
           if ("activeCoachId" in partial) firestoreFields.activeCoachId = partial.activeCoachId;
           if ("activeCoachOwnerUid" in partial) firestoreFields.activeCoachOwnerUid = partial.activeCoachOwnerUid;
+          if ("punishmentsEnabled" in partial) firestoreFields.punishmentsEnabled = partial.punishmentsEnabled;
+          if ("pokeEnabled" in partial) firestoreFields.pokeEnabled = partial.pokeEnabled;
+          if ("audioPunishments" in partial) firestoreFields.audioPunishments = partial.audioPunishments;
 
           if (Object.keys(firestoreFields).length > 0) {
             updateDoc(userRef, firestoreFields);
