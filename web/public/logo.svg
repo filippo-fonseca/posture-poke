@@ -1,25 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80" fill="currentColor">
-  <!-- Spinous process (tall center spike) -->
-  <path d="M56 0 Q58 0 60 2 Q62 0 64 0 L62 30 Q60 34 58 30 Z"/>
-
-  <!-- Left articular facet (inner spike) -->
-  <path d="M44 12 Q42 10 40 12 L46 32 Q48 34 48 30 Z"/>
-
-  <!-- Right articular facet (inner spike) -->
-  <path d="M76 12 Q78 10 80 12 L74 32 Q72 34 72 30 Z"/>
-
-  <!-- Lamina — left arch -->
-  <path d="M48 30 Q44 36 36 40 Q34 40 34 38 L46 32 Z"/>
-
-  <!-- Lamina — right arch -->
-  <path d="M72 30 Q76 36 84 40 Q86 40 86 38 L74 32 Z"/>
-
-  <!-- Left transverse process (outer wing) -->
-  <path d="M34 38 Q28 40 8 50 Q4 52 4 56 Q4 60 8 58 L36 46 Q38 44 36 40 Z"/>
-
-  <!-- Right transverse process (outer wing) -->
-  <path d="M86 38 Q92 40 112 50 Q116 52 116 56 Q116 60 112 58 L84 46 Q82 44 84 40 Z"/>
-
-  <!-- Base arch connecting it all -->
-  <path d="M36 46 Q38 56 44 62 Q50 68 60 70 Q70 68 76 62 Q82 56 84 46 L80 44 Q78 54 74 58 Q68 64 60 66 Q52 64 46 58 Q42 54 40 44 Z"/>
+<svg width="400" height="600" viewBox="0 0 400 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path
+    d="M160,80 Q200,70 240,80 L240,110 Q280,110 320,105 Q330,125 320,140 Q280,145 235,140
+       L240,180 Q290,185 330,175 Q340,200 330,225 Q290,230 245,220
+       L250,280 Q310,290 355,275 Q365,310 355,340 Q310,350 250,340
+       L255,420 Q330,440 370,420 Q380,460 370,490 Q320,510 255,495
+       L260,560 Q200,570 140,560
+       L145,495 Q80,510 30,490 Q20,460 30,420 Q70,440 145,420
+       L150,340 Q90,350 45,340 Q35,310 45,275 Q90,290 150,280
+       L155,220 Q110,230 70,225 Q60,200 70,175 Q110,185 160,180
+       L165,140 Q120,145 80,140 Q70,125 80,105 Q120,110 160,110 Z"
+    fill="currentColor"
+  />
 </svg>

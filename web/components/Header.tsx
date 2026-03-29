@@ -5,12 +5,13 @@ import { useAuth } from "@/lib/auth";
 
 interface HeaderProps {
   onSettingsClick?: () => void;
-  /** If true, sign-out will show a confirmation prompt */
+  onFriendsClick?: () => void;
+  hasPendingRequests?: boolean;
   sessionActive?: boolean;
   onStopSession?: () => void;
 }
 
-export function Header({ onSettingsClick, sessionActive, onStopSession }: HeaderProps) {
+export function Header({ onSettingsClick, onFriendsClick, hasPendingRequests, sessionActive, onStopSession }: HeaderProps) {
   const { theme, toggle } = useTheme();
   const { user, signOut } = useAuth();
 
@@ -30,7 +31,7 @@ export function Header({ onSettingsClick, sessionActive, onStopSession }: Header
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-14 items-center justify-between">
           <h1 className="flex items-center gap-2 text-lg font-bold tracking-tight">
-            <img src="/logo.svg" alt="" className="h-5 w-5 dark:invert" />
+            <img src="/logo.svg" alt="" className="h-7 w-7 dark:invert" />
             PosturePoke
           </h1>
 
@@ -43,6 +44,18 @@ export function Header({ onSettingsClick, sessionActive, onStopSession }: Header
                 </span>
               </div>
             )}
+            <button
+              onClick={onFriendsClick}
+              className="relative rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
+              aria-label="Friends"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" />
+              </svg>
+              {hasPendingRequests && (
+                <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
+              )}
+            </button>
             <button
               onClick={onSettingsClick}
               className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"

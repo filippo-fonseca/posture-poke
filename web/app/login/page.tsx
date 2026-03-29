@@ -88,7 +88,7 @@ export default function LoginPage() {
         <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-14 items-center justify-between">
             <span className="flex items-center gap-2 text-lg font-bold tracking-tight">
-              <img src="/logo.svg" alt="" className="h-5 w-5 dark:invert" />
+              <img src="/logo.svg" alt="" className="h-7 w-7 dark:invert" />
               PosturePoke
             </span>
             <button

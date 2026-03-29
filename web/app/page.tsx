@@ -30,12 +30,21 @@ import { SpineDecoration } from "@/components/SpineDecoration";
 import { usePostureSession } from "@/hooks/usePostureSession";
 import { useVoiceAlert } from "@/hooks/useVoiceAlert";
 import { useCoaches } from "@/hooks/useCoaches";
+import { useFriends } from "@/hooks/useFriends";
+import {
+  useFriendsLatestSessions,
+  useFriendCoaches,
+  useFriendSessions,
+} from "@/hooks/useFriendData";
+import { CoachPreviewButton } from "@/components/CoachPreviewButton";
+import { COACH_IDEAS } from "@/lib/coach-ideas";
 import { useTheme } from "@/lib/theme";
 import type {
   PunishmentMarker,
   CoachDoc,
   SessionDoc,
   ChartDataPoint,
+  FriendProfile,
 } from "@/lib/types";
 import {
   AreaChart,
@@ -80,9 +89,13 @@ function DashboardContent() {
   const session = usePostureSession();
   const { user } = useAuth();
   const { settings, update, slouchThreshold } = useSettings();
+  const friendsData = useFriends();
+  const friendsFeed = useFriendsLatestSessions(friendsData.friends);
   const punishmentMarkersRef = useRef<PunishmentMarker[]>([]);
 
-  const [view, setView] = useState<"monitor" | "settings">("monitor");
+  const [view, setView] = useState<"monitor" | "settings" | "friends">(
+    "monitor",
+  );
   const [modalStep, setModalStep] = useState<ModalStep>(null);
   const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
   const [completedSummary, setCompletedSummary] = useState<{
@@ -178,6 +191,7 @@ function DashboardContent() {
         endedAt: Timestamp.now(),
         durationSeconds: data.sessionDuration,
         goodPct: data.goodPct,
+        avgDeviation: data.avgDeviation,
         alertCount: data.alertCount,
         bestStreak: data.bestStreak,
         slouchThreshold,
@@ -195,6 +209,7 @@ function DashboardContent() {
     harshness: number;
     instructionType: InstructionType;
     activeCoachId: string | null;
+    activeCoachOwnerUid: string | null;
     coachAudioFiles: string[];
   }) => {
     update(cfg);
@@ -226,6 +241,10 @@ function DashboardContent() {
         onSettingsClick={() =>
           setView(view === "settings" ? "monitor" : "settings")
         }
+        onFriendsClick={() =>
+          setView(view === "friends" ? "monitor" : "friends")
+        }
+        hasPendingRequests={friendsData.pendingIncoming.length > 0}
         sessionActive={session.sessionState !== "idle"}
         onStopSession={() => session.stopSession()}
       />
@@ -233,6 +252,8 @@ function DashboardContent() {
       <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
         {view === "settings" ? (
           <SettingsPanel onBack={() => setView("monitor")} />
+        ) : view === "friends" ? (
+          <FriendsView onBack={() => setView("monitor")} />
         ) : session.sessionState !== "idle" ? (
           <ActiveSessionView session={session} onStop={handleStop} />
         ) : (
@@ -243,6 +264,7 @@ function DashboardContent() {
             sessions={pastSessions}
             sessionsLoading={sessionsLoading}
             onSessionClick={setDetailSessionId}
+            friendsFeed={friendsFeed.data}
           />
         )}
       </main>
@@ -288,6 +310,47 @@ function DashboardContent() {
   );
 }
 
+function FriendFeedChart({ uid, session: s }: { uid: string; session: SessionDoc }) {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const threshold = s.slouchThreshold ?? 20;
+  const greenStop = `${(1 - threshold / 50) * 100}%`;
+  const amberStop = `${(1 - Math.min(threshold + 15, 50) / 50) * 100}%`;
+
+  return (
+    <div className="mt-2 h-[50px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={s.chartData} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
+          <defs>
+            <linearGradient id={`ff-f-${uid}`} x1="0" y1="0" x2="0" y2="50" gradientUnits="userSpaceOnUse">
+              <stop key="f0" offset="0%" stopColor="#ef4444" stopOpacity={isDark ? 0.2 : 0.1} />
+              <stop key="f1" offset={greenStop} stopColor="#ef4444" stopOpacity={0.02} />
+              <stop key="f2" offset={greenStop} stopColor="#22c55e" stopOpacity={0.02} />
+              <stop key="f3" offset="100%" stopColor="#22c55e" stopOpacity={isDark ? 0.2 : 0.1} />
+            </linearGradient>
+            <linearGradient id={`ff-s-${uid}`} x1="0" y1="0" x2="0" y2="50" gradientUnits="userSpaceOnUse">
+              <stop key="s0" offset="0%" stopColor="#ef4444" />
+              <stop key="s1" offset={amberStop} stopColor="#ef4444" />
+              <stop key="s2" offset={amberStop} stopColor="#f59e0b" />
+              <stop key="s3" offset={greenStop} stopColor="#f59e0b" />
+              <stop key="s4" offset={greenStop} stopColor="#22c55e" />
+              <stop key="s5" offset="100%" stopColor="#22c55e" />
+            </linearGradient>
+          </defs>
+          <Area
+            type="monotone"
+            dataKey="delta"
+            stroke={`url(#ff-s-${uid})`}
+            strokeWidth={1}
+            fill={`url(#ff-f-${uid})`}
+            isAnimationActive={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 // ── Idle view (start button + past sessions) ────────────────────────────────
 
 function IdleView({
@@ -297,6 +360,7 @@ function IdleView({
   sessions,
   sessionsLoading,
   onSessionClick,
+  friendsFeed,
 }: {
   isConnected: boolean;
   onStart: () => void;
@@ -304,6 +368,7 @@ function IdleView({
   sessions: SessionDoc[];
   sessionsLoading: boolean;
   onSessionClick: (id: string) => void;
+  friendsFeed: import("@/hooks/useFriendData").FriendLatestSession[];
 }) {
   const lastSession = sessions.length > 0 ? sessions[0] : null;
 
@@ -377,6 +442,68 @@ function IdleView({
         </div>
       </div>
 
+      {/* Friends feed */}
+      {friendsFeed.length > 0 && (
+        <section>
+          <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-3">
+            Friends&apos; Latest Sessions
+          </h2>
+          <div className="max-h-72 overflow-y-auto space-y-2 rounded-lg">
+            {friendsFeed.map(({ friend, session: s }) => (
+              <div
+                key={friend.uid}
+                className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4"
+              >
+                <div className="flex items-center gap-3">
+                  {friend.photoURL ? (
+                    <img
+                      src={friend.photoURL}
+                      alt=""
+                      className="h-7 w-7 rounded-full"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="h-7 w-7 rounded-full bg-zinc-200 dark:bg-zinc-700" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium truncate">
+                        {friend.displayName}
+                      </p>
+                      <div className="text-right">
+                        <span
+                          className={`font-mono text-sm font-medium ${
+                            s.goodPct >= 70
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : s.goodPct >= 40
+                                ? "text-amber-600 dark:text-amber-400"
+                                : "text-red-600 dark:text-red-400"
+                          }`}
+                        >
+                          {s.goodPct}%
+                        </span>
+                        {s.avgDeviation != null && (
+                          <p className="text-[10px] text-zinc-400 font-mono">
+                            avg {s.avgDeviation.toFixed(1)}&deg;
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                      {formatDuration(s.durationSeconds)} &middot;{" "}
+                      {formatDate(s.endedAt)}
+                    </p>
+                  </div>
+                </div>
+                {s.chartData?.length > 0 && (
+                  <FriendFeedChart uid={friend.uid} session={s} />
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section>
         <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-3">
           Past Sessions
@@ -428,17 +555,24 @@ function IdleView({
                       {(s.punishmentMarkers?.length ?? 0) !== 1 ? "s" : ""}
                     </p>
                   </div>
-                  <span
-                    className={`font-mono text-lg font-medium ${
-                      s.goodPct >= 70
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : s.goodPct >= 50
-                          ? "text-amber-600 dark:text-amber-400"
-                          : "text-red-600 dark:text-red-400"
-                    }`}
-                  >
-                    {s.goodPct}%
-                  </span>
+                  <div className="text-right">
+                    <span
+                      className={`font-mono text-lg font-medium ${
+                        s.goodPct >= 70
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : s.goodPct >= 50
+                            ? "text-amber-600 dark:text-amber-400"
+                            : "text-red-600 dark:text-red-400"
+                      }`}
+                    >
+                      {s.goodPct}%
+                    </span>
+                    {s.avgDeviation != null && (
+                      <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">
+                        avg {s.avgDeviation.toFixed(1)}&deg;
+                      </p>
+                    )}
+                  </div>
                 </div>
               </button>
             ))}
@@ -1047,6 +1181,354 @@ function SessionChart({
   );
 }
 
+// ── Friends view ────────────────────────────────────────────────────────────
+
+function FriendsView({ onBack }: { onBack: () => void }) {
+  const {
+    friends,
+    pendingIncoming,
+    pendingOutgoing,
+    loading,
+    sendRequest,
+    acceptRequest,
+    declineRequest,
+    removeFriend,
+  } = useFriends();
+  const [email, setEmail] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState<string | null>(null);
+  const [expandedFriend, setExpandedFriend] = useState<string | null>(null);
+
+  const handleSend = async () => {
+    setSending(true);
+    setSendResult(null);
+    const err = await sendRequest(email);
+    setSendResult(err ?? "Invite sent!");
+    if (!err) setEmail("");
+    setSending(false);
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      <button
+        onClick={onBack}
+        className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors mb-6"
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M19 12H5M12 19l-7-7 7-7" />
+        </svg>
+        Back
+      </button>
+
+      <h2 className="text-lg font-bold mb-1">Friends</h2>
+      <p className="text-xs font-medium mb-6">More friends = more coaches</p>
+
+      {/* Send invite */}
+      <div className="flex gap-2 mb-6">
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSend()}
+          placeholder="Friend's email"
+          className="flex-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-400 dark:focus:border-zinc-600 transition-colors"
+        />
+        <button
+          onClick={handleSend}
+          disabled={sending || !email.trim()}
+          className="rounded-lg bg-zinc-900 dark:bg-zinc-100 px-4 py-2 text-sm font-medium text-white dark:text-zinc-900 transition-colors hover:bg-zinc-700 dark:hover:bg-zinc-300 disabled:opacity-40"
+        >
+          {sending ? "..." : "Send Invite"}
+        </button>
+      </div>
+      {sendResult && (
+        <p
+          className={`text-xs mb-4 ${sendResult === "Invite sent!" ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}`}
+        >
+          {sendResult}
+        </p>
+      )}
+
+      {/* Pending incoming */}
+      {pendingIncoming.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-2">
+            Incoming Requests
+          </h3>
+          <div className="space-y-2">
+            {pendingIncoming.map((req) => (
+              <div
+                key={req.id}
+                className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  {req.profile.photoURL ? (
+                    <img
+                      src={req.profile.photoURL}
+                      alt=""
+                      className="h-6 w-6 rounded-full"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="h-6 w-6 rounded-full bg-zinc-200 dark:bg-zinc-700" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium">
+                      {req.profile.displayName}
+                    </p>
+                    <p className="text-[10px] text-zinc-400">
+                      {req.profile.email}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => acceptRequest(req.id)}
+                    className="rounded-md bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700 transition-colors"
+                  >
+                    Accept
+                  </button>
+                  <button
+                    onClick={() => declineRequest(req.id)}
+                    className="rounded-md border border-zinc-200 dark:border-zinc-700 px-3 py-1 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                  >
+                    Decline
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Pending outgoing */}
+      {pendingOutgoing.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-2">
+            Sent Requests
+          </h3>
+          <div className="space-y-2">
+            {pendingOutgoing.map((req) => (
+              <div
+                key={req.id}
+                className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  {req.profile.photoURL ? (
+                    <img
+                      src={req.profile.photoURL}
+                      alt=""
+                      className="h-6 w-6 rounded-full"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="h-6 w-6 rounded-full bg-zinc-200 dark:bg-zinc-700" />
+                  )}
+                  <p className="text-sm">{req.profile.displayName}</p>
+                </div>
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                  Pending
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Friends list */}
+      <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-2">
+        {loading
+          ? "Loading..."
+          : `${friends.length} friend${friends.length !== 1 ? "s" : ""}`}
+      </h3>
+      {friends.length === 0 && !loading && (
+        <div className="flex flex-col items-center justify-center py-12 text-center rounded-lg border border-dashed border-zinc-200 dark:border-zinc-800">
+          <svg
+            width="36"
+            height="36"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            className="mb-3 text-zinc-300 dark:text-zinc-700"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 00-3-3.87" />
+            <path d="M16 3.13a4 4 0 010 7.75" />
+          </svg>
+          <p className="text-sm text-zinc-400 dark:text-zinc-500">
+            No friends yet — send an invite above
+          </p>
+        </div>
+      )}
+      <div className="space-y-2">
+        {friends.map((f) => (
+          <FriendCard
+            key={f.uid}
+            friend={f}
+            expanded={expandedFriend === f.uid}
+            onToggle={() =>
+              setExpandedFriend(expandedFriend === f.uid ? null : f.uid)
+            }
+            onRemove={() => removeFriend(f.uid)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FriendCard({
+  friend,
+  expanded,
+  onToggle,
+  onRemove,
+}: {
+  friend: FriendProfile;
+  expanded: boolean;
+  onToggle: () => void;
+  onRemove: () => void;
+}) {
+  const { sessions, loading: sessionsLoading } = useFriendSessions(
+    expanded ? friend.uid : null,
+  );
+  const { coaches, loading: coachesLoading } = useFriendCoaches(
+    expanded ? friend.uid : null,
+  );
+
+  return (
+    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full p-3 flex items-center justify-between text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          {friend.photoURL ? (
+            <img
+              src={friend.photoURL}
+              alt=""
+              className="h-7 w-7 rounded-full"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="h-7 w-7 rounded-full bg-zinc-200 dark:bg-zinc-700" />
+          )}
+          <div>
+            <p className="text-sm font-medium">{friend.displayName}</p>
+            <p className="text-[10px] text-zinc-400">{friend.email}</p>
+          </div>
+        </div>
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`text-zinc-400 transition-transform ${expanded ? "rotate-180" : ""}`}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-zinc-200 dark:border-zinc-800 p-3 space-y-4">
+          {/* Coaches */}
+          <div>
+            <h4 className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1.5">
+              Coaches
+            </h4>
+            {coachesLoading ? (
+              <div className="shimmer h-10 w-full rounded-lg" />
+            ) : coaches.length === 0 ? (
+              <p className="text-xs text-zinc-400">No coaches</p>
+            ) : (
+              <div className="space-y-1">
+                {coaches.map((c) => (
+                  <div
+                    key={c.id}
+                    className="flex items-center justify-between rounded-md bg-zinc-50 dark:bg-zinc-800 px-2.5 py-1.5"
+                  >
+                    <p className="text-xs truncate flex-1">{c.description}</p>
+                    <CoachPreviewButton coach={c} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Sessions */}
+          <div>
+            <h4 className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1.5">
+              Sessions
+            </h4>
+            {sessionsLoading ? (
+              <div className="shimmer h-10 w-full rounded-lg" />
+            ) : sessions.length === 0 ? (
+              <p className="text-xs text-zinc-400">No sessions</p>
+            ) : (
+              <div className="space-y-1 max-h-48 overflow-y-auto">
+                {sessions.map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between rounded-md bg-zinc-50 dark:bg-zinc-800 px-2.5 py-1.5"
+                  >
+                    <div>
+                      <p className="text-xs">{formatDate(s.endedAt)}</p>
+                      <p className="text-[10px] text-zinc-400">
+                        {formatDuration(s.durationSeconds)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span
+                        className={`font-mono text-xs font-medium ${
+                          s.goodPct >= 70
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : s.goodPct >= 40
+                              ? "text-amber-600 dark:text-amber-400"
+                              : "text-red-600 dark:text-red-400"
+                        }`}
+                      >
+                        {s.goodPct}%
+                      </span>
+                      {s.avgDeviation != null && (
+                        <p className="text-[9px] text-zinc-400 font-mono">
+                          avg {s.avgDeviation.toFixed(1)}&deg;
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={onRemove}
+            className="text-xs text-red-500 hover:text-red-600 transition-colors"
+          >
+            Remove friend
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Settings panel (coach management only) ──────────────────────────────────
 
 function SettingsPanel({ onBack }: { onBack: () => void }) {
@@ -1127,6 +1609,7 @@ function SettingsPanel({ onBack }: { onBack: () => void }) {
                     {coach.audioFiles.length} clips
                   </p>
                 </div>
+                <CoachPreviewButton coach={coach} />
                 <button
                   onClick={() => coach.id && deleteCoach(coach.id)}
                   className="rounded p-1.5 text-zinc-400 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-500 transition-colors"
@@ -1153,9 +1636,28 @@ function SettingsPanel({ onBack }: { onBack: () => void }) {
 
         {canCreate && (
           <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-            <h3 className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-2">
-              Create New Coach
-            </h3>
+            <div className="flex items-center gap-2 mb-2">
+              <h3 className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                Create New Coach
+              </h3>
+              {!coachPrompt.trim() && (
+                <button
+                  type="button"
+                  onClick={() => setCoachPrompt(COACH_IDEAS[Math.floor(Math.random() * COACH_IDEAS.length)])}
+                  className="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                  title="Random coach idea"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="2" width="20" height="20" rx="3" />
+                    <circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none" />
+                    <circle cx="16" cy="8" r="1.5" fill="currentColor" stroke="none" />
+                    <circle cx="8" cy="16" r="1.5" fill="currentColor" stroke="none" />
+                    <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none" />
+                    <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                  </svg>
+                </button>
+              )}
+            </div>
             <textarea
               value={coachPrompt}
               onChange={(e) => setCoachPrompt(e.target.value)}
@@ -1213,6 +1715,7 @@ function ConfigModal({
     harshness: number;
     instructionType: InstructionType;
     activeCoachId: string | null;
+    activeCoachOwnerUid: string | null;
     coachAudioFiles: string[];
   }) => void;
   onCancel: () => void;
@@ -1232,9 +1735,63 @@ function ConfigModal({
   const [selectedCoachId, setSelectedCoachId] = useState<string | null>(
     defaults.activeCoachId,
   );
+  const [selectedCoachOwnerUid, setSelectedCoachOwnerUid] = useState<
+    string | null
+  >(null);
   const { coaches, loading: coachesLoading } = useCoaches();
+  const { friends } = useFriends();
 
-  const selectedCoach = coaches.find((c) => c.id === selectedCoachId);
+  // Load friend coaches
+  const [friendCoaches, setFriendCoaches] = useState<
+    { friend: FriendProfile; coaches: CoachDoc[] }[]
+  >([]);
+  useEffect(() => {
+    if (friends.length === 0) {
+      setFriendCoaches([]);
+      return;
+    }
+    const db = getFirebaseDb();
+    Promise.all(
+      friends.map(async (f) => {
+        try {
+          const q = query(
+            collection(db, "users", f.uid, "coaches"),
+            orderBy("createdAt", "desc"),
+          );
+          const snap = await getDocs(q);
+          const fCoaches = snap.docs.map(
+            (d) => ({ id: d.id, ...d.data() }) as CoachDoc,
+          );
+          return fCoaches.length > 0 ? { friend: f, coaches: fCoaches } : null;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((results) =>
+      setFriendCoaches(
+        results.filter(
+          (r): r is { friend: FriendProfile; coaches: CoachDoc[] } =>
+            r !== null,
+        ),
+      ),
+    );
+  }, [friends]);
+
+  const allCoaches = [
+    ...coaches.map((c) => ({
+      ...c,
+      ownerUid: null as string | null,
+      ownerName: null as string | null,
+    })),
+    ...friendCoaches.flatMap(({ friend, coaches: fc }) =>
+      fc.map((c) => ({
+        ...c,
+        ownerUid: friend.uid,
+        ownerName: friend.displayName,
+      })),
+    ),
+  ];
+  const selectedCoach = allCoaches.find((c) => c.id === selectedCoachId);
   const canProceed =
     isConnected &&
     (instructionType === "farts" ||
@@ -1459,26 +2016,66 @@ function ConfigModal({
             </div>
             {coachesLoading ? (
               <div className="shimmer h-12 w-full rounded-lg" />
-            ) : coaches.length === 0 ? (
+            ) : allCoaches.length === 0 ? (
               <p className="text-xs text-zinc-400 dark:text-zinc-500 py-3">
                 No coaches yet. Create one from the settings panel (gear icon).
               </p>
             ) : (
-              <div className="space-y-1.5 max-h-36 overflow-y-auto">
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {coaches.length > 0 && (
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium uppercase tracking-wide">
+                    Your Coaches
+                  </p>
+                )}
                 {coaches.map((coach) => (
-                  <button
-                    key={coach.id}
-                    onClick={() => setSelectedCoachId(coach.id ?? null)}
-                    className={`w-full rounded-lg border p-2.5 text-left transition-colors ${
-                      selectedCoachId === coach.id
-                        ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20"
-                        : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
-                    }`}
-                  >
-                    <span className="block text-sm truncate">
-                      {coach.description}
-                    </span>
-                  </button>
+                  <div key={coach.id} className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        setSelectedCoachId(coach.id ?? null);
+                        setSelectedCoachOwnerUid(null);
+                      }}
+                      className={`flex-1 rounded-lg border p-2.5 text-left transition-colors ${
+                        selectedCoachId === coach.id
+                          ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20"
+                          : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
+                      }`}
+                    >
+                      <span className="block text-sm leading-snug">
+                        {coach.description}
+                      </span>
+                    </button>
+                    <CoachPreviewButton coach={coach} />
+                  </div>
+                ))}
+                {friendCoaches.map(({ friend, coaches: fc }) => (
+                  <div key={friend.uid}>
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium uppercase tracking-wide mt-2">
+                      {friend.displayName}&apos;s Coaches
+                    </p>
+                    {fc.map((coach) => (
+                      <div
+                        key={coach.id}
+                        className="flex items-center gap-1 mt-1.5"
+                      >
+                        <button
+                          onClick={() => {
+                            setSelectedCoachId(coach.id ?? null);
+                            setSelectedCoachOwnerUid(friend.uid);
+                          }}
+                          className={`flex-1 rounded-lg border p-2.5 text-left transition-colors ${
+                            selectedCoachId === coach.id
+                              ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20"
+                              : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700"
+                          }`}
+                        >
+                          <span className="block text-sm leading-snug">
+                            {coach.description}
+                          </span>
+                        </button>
+                        <CoachPreviewButton coach={coach} />
+                      </div>
+                    ))}
+                  </div>
                 ))}
               </div>
             )}
@@ -1494,6 +2091,8 @@ function ConfigModal({
                 instructionType,
                 activeCoachId:
                   instructionType === "coach" ? selectedCoachId : null,
+                activeCoachOwnerUid:
+                  instructionType === "coach" ? selectedCoachOwnerUid : null,
                 coachAudioFiles:
                   instructionType === "coach" && selectedCoach
                     ? selectedCoach.audioFiles

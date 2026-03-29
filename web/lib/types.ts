@@ -32,6 +32,7 @@ export interface SessionDoc {
   endedAt: number;
   durationSeconds: number;
   goodPct: number;
+  avgDeviation: number;
   alertCount: number;
   bestStreak: number;
   slouchThreshold: number;
@@ -65,6 +66,7 @@ export interface SessionSaveData {
   allChartData: ChartDataPoint[];
   sessionDuration: number;
   goodPct: number;
+  avgDeviation: number;
   alertCount: number;
   bestStreak: number;
 }

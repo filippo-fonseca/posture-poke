@@ -100,7 +100,10 @@ export default function Landing() {
       <header className="sticky top-0 z-50 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-14 items-center justify-between">
-            <span className="text-lg font-bold tracking-tight">PosturePoke</span>
+            <span className="flex items-center gap-2 text-lg font-bold tracking-tight">
+              <img src="/logo.svg" alt="" className="h-7 w-7 dark:invert" />
+              PosturePoke
+            </span>
             <div className="flex items-center gap-3">
               <Link
                 href={appHref}

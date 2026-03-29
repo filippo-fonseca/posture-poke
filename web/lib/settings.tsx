@@ -81,6 +81,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             harshness: parsed.harshness ?? DEFAULT_SETTINGS.harshness,
             instructionType: parsed.instructionType ?? DEFAULT_SETTINGS.instructionType,
             activeCoachId: parsed.activeCoachId ?? null,
+            activeCoachOwnerUid: parsed.activeCoachOwnerUid ?? null,
             coachAudioFiles: parsed.coachAudioFiles ?? [],
           });
         }
@@ -95,17 +96,19 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     getDoc(userRef).then((snap) => {
       if (snap.exists()) {
         const data = snap.data();
+        const ownerUid = data.activeCoachOwnerUid ?? null;
         setSettings({
           strictness: data.strictness ?? DEFAULT_SETTINGS.strictness,
           harshness: data.harshness ?? DEFAULT_SETTINGS.harshness,
           instructionType: data.instructionType ?? DEFAULT_SETTINGS.instructionType,
           activeCoachId: data.activeCoachId ?? null,
+          activeCoachOwnerUid: ownerUid,
           coachAudioFiles: [],
         });
 
         // Resolve active coach audio files
         if (data.activeCoachId) {
-          const coachRef = doc(db, "users", user.uid, "coaches", data.activeCoachId);
+          const coachRef = doc(db, "users", ownerUid || user.uid, "coaches", data.activeCoachId);
           getDoc(coachRef).then((coachSnap) => {
             if (coachSnap.exists()) {
               const coach = coachSnap.data() as CoachDoc;
@@ -143,6 +146,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           if ("harshness" in partial) firestoreFields.harshness = partial.harshness;
           if ("instructionType" in partial) firestoreFields.instructionType = partial.instructionType;
           if ("activeCoachId" in partial) firestoreFields.activeCoachId = partial.activeCoachId;
+          if ("activeCoachOwnerUid" in partial) firestoreFields.activeCoachOwnerUid = partial.activeCoachOwnerUid;
 
           if (Object.keys(firestoreFields).length > 0) {
             updateDoc(userRef, firestoreFields);
@@ -150,7 +154,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
           // If activeCoachId changed, resolve audio files
           if ("activeCoachId" in partial && partial.activeCoachId) {
-            const coachRef = doc(db, "users", user.uid, "coaches", partial.activeCoachId);
+            const coachOwner = partial.activeCoachOwnerUid ?? next.activeCoachOwnerUid ?? user.uid;
+            const coachRef = doc(db, "users", coachOwner, "coaches", partial.activeCoachId);
             getDoc(coachRef).then((snap) => {
               if (snap.exists()) {
                 const coach = snap.data() as CoachDoc;

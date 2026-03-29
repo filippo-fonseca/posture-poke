@@ -88,14 +88,19 @@ export function usePostureSession(): PostureSession {
   }, []);
 
   const stopSession = useCallback((): SessionSaveData => {
+    const chartData = allSessionDataRef.current;
+    const avgDev = chartData.length > 0
+      ? chartData.reduce((sum, p) => sum + p.delta, 0) / chartData.length
+      : 0;
     const data: SessionSaveData = {
       startTime: sessionStart ?? Date.now(),
-      allChartData: [...allSessionDataRef.current],
+      allChartData: [...chartData],
       sessionDuration,
       goodPct:
         totalReadings > 0
           ? Math.round((goodReadings / totalReadings) * 100)
           : 100,
+      avgDeviation: Math.round(avgDev * 10) / 10,
       alertCount,
       bestStreak,
     };
