@@ -105,6 +105,9 @@ function DashboardContent() {
     duration: number;
     alerts: number;
     bestStreak: number;
+    chartData: ChartDataPoint[];
+    punishmentMarkers: PunishmentMarker[];
+    slouchThreshold: number;
   } | null>(null);
 
   // Past sessions list
@@ -183,6 +186,9 @@ function DashboardContent() {
       duration: data.sessionDuration,
       alerts: data.alertCount,
       bestStreak: data.bestStreak,
+      chartData: data.allChartData,
+      punishmentMarkers: markers,
+      slouchThreshold,
     });
     setModalStep("share");
 
@@ -837,6 +843,9 @@ function ShareModal({
     duration: number;
     alerts: number;
     bestStreak: number;
+    chartData: ChartDataPoint[];
+    punishmentMarkers: PunishmentMarker[];
+    slouchThreshold: number;
   };
   onClose: () => void;
 }) {
@@ -897,9 +906,12 @@ function ShareModal({
   ];
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
-      <div className="w-full max-w-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 shadow-xl">
-        <h2 className="text-lg font-bold mb-1 text-center">Session Complete</h2>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-10">
+      <div className="w-full max-w-lg max-h-[calc(100vh-5rem)] flex flex-col rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-xl">
+        <div className="px-6 pt-6 pb-2 shrink-0">
+          <h2 className="text-lg font-bold mb-1 text-center">Session Complete</h2>
+        </div>
+        <div className="px-6 pb-6 overflow-y-auto">
 
         <div className="my-5 grid grid-cols-2 gap-3">
           <div className="rounded-lg bg-zinc-50 dark:bg-zinc-900 p-3 text-center">
@@ -936,7 +948,15 @@ function ShareModal({
           </div>
         </div>
 
-        <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center mb-3">
+        {summary.chartData.length > 0 && (
+          <SessionChart
+            chartData={summary.chartData}
+            punishmentMarkers={summary.punishmentMarkers}
+            slouchThreshold={summary.slouchThreshold}
+          />
+        )}
+
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center mb-3 mt-5">
           Share your results
         </p>
 
@@ -955,12 +975,15 @@ function ShareModal({
           ))}
         </div>
 
-        <button
-          onClick={onClose}
-          className="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 py-2.5 text-sm font-medium transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900"
-        >
-          Done
-        </button>
+        </div>
+        <div className="px-6 pb-6 pt-2 shrink-0">
+          <button
+            onClick={onClose}
+            className="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 py-2.5 text-sm font-medium transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900"
+          >
+            Done
+          </button>
+        </div>
       </div>
     </div>
   );
