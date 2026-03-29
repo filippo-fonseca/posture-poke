@@ -44,8 +44,9 @@ export function useSerial(): UseSerial {
   const readLoop = useCallback(async (port: SerialPort) => {
     const decoder = new TextDecoder();
     while (port.readable && mountedRef.current) {
+      let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
       try {
-        const reader = port.readable.getReader();
+        reader = port.readable.getReader();
         readerRef.current = reader;
         while (true) {
           const { value, done } = await reader.read();
@@ -60,9 +61,12 @@ export function useSerial(): UseSerial {
             if (trimmed) processLine(trimmed);
           }
         }
-        reader.releaseLock();
       } catch {
-        break;
+        // Port error or cancelled
+      } finally {
+        if (reader) {
+          try { reader.releaseLock(); } catch {}
+        }
       }
     }
     if (mountedRef.current) setIsConnected(false);
@@ -91,13 +95,33 @@ export function useSerial(): UseSerial {
   }, []);
 
   const connect = useCallback(async () => {
-    if (portRef.current) return;
+    // Clean up any stale connection first
+    if (portRef.current) {
+      if (readerRef.current) {
+        try { await readerRef.current.cancel(); } catch {}
+        readerRef.current = null;
+      }
+      if (writerRef.current) {
+        try { writerRef.current.releaseLock(); } catch {}
+        writerRef.current = null;
+      }
+      try { await portRef.current.close(); } catch {}
+      portRef.current = null;
+    }
+
     try {
       const port = await navigator.serial.requestPort();
-      await port.open({ baudRate: 115200 });
+
+      // Port may already be open from a previous session — close and reopen
+      try {
+        await port.open({ baudRate: 115200 });
+      } catch {
+        try { await port.close(); } catch {}
+        await port.open({ baudRate: 115200 });
+      }
+
       portRef.current = port;
 
-      // Grab writer for sending commands
       if (port.writable) {
         writerRef.current = port.writable.getWriter();
       }
@@ -106,7 +130,8 @@ export function useSerial(): UseSerial {
       lineBufferRef.current = "";
       readLoop(port);
     } catch {
-      // User cancelled the port picker or open failed
+      // User cancelled the port picker
+      if (mountedRef.current) setIsConnected(false);
     }
   }, [readLoop]);
 

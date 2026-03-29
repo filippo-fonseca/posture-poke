@@ -136,7 +136,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           strictness: DEFAULT_SETTINGS.strictness,
           harshness: DEFAULT_SETTINGS.harshness,
           instructionType: DEFAULT_SETTINGS.instructionType,
+          punishmentsEnabled: DEFAULT_SETTINGS.punishmentsEnabled,
+          pokeEnabled: DEFAULT_SETTINGS.pokeEnabled,
+          audioPunishments: DEFAULT_SETTINGS.audioPunishments,
           activeCoachId: null,
+          activeCoachOwnerUid: null,
         });
       }
       setFirestoreReady(true);

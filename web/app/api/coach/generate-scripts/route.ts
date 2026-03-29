@@ -51,17 +51,22 @@ Return ONLY a JSON array of 10 strings. Example: ["line 1", "line 2", ...]`;
     );
   }
 
-  const data = await resp.json();
-  // gemini-2.5-flash returns thought parts — grab the last non-thought part
-  const parts = data.candidates[0].content.parts;
-  let text: string = parts.filter((p: { thought?: boolean }) => !p.thought).pop().text.trim();
+  try {
+    const data = await resp.json();
+    const parts = data.candidates[0].content.parts;
+    let text: string = parts.filter((p: { thought?: boolean }) => !p.thought).pop().text.trim();
 
-  // Strip markdown code fences if Gemini wraps them
-  if (text.startsWith("```")) {
-    text = text.split("\n").slice(1).join("\n");
-    text = text.replace(/```\s*$/, "").trim();
+    if (text.startsWith("```")) {
+      text = text.split("\n").slice(1).join("\n");
+      text = text.replace(/```\s*$/, "").trim();
+    }
+
+    const scripts: string[] = JSON.parse(text);
+    return NextResponse.json({ scripts: scripts.slice(0, 10) });
+  } catch {
+    return NextResponse.json(
+      { error: "Failed to parse Gemini response" },
+      { status: 502 }
+    );
   }
-
-  const scripts: string[] = JSON.parse(text);
-  return NextResponse.json({ scripts: scripts.slice(0, 10) });
 }

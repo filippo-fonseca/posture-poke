@@ -92,6 +92,7 @@ export function useVoiceAlert({
     }
 
     let punishmentType: "beep" | "fart" | "coach" = "beep";
+    let didPlay = false;
 
     // Play a random sound from the pool
     if (soundPool.length > 0) {
@@ -100,15 +101,18 @@ export function useVoiceAlert({
       const audio = new Audio(pick.url);
       audioRef.current = audio;
       audio.play().catch(() => {});
+      didPlay = true;
     }
 
     // Trigger the poker if enabled
     const poked = settings.pokeEnabled;
     if (poked) {
       onPoke?.();
+      didPlay = true;
     }
 
-    if (onPunishment) {
+    // Only log if something actually happened
+    if (didPlay && onPunishment) {
       const minutes = Math.floor(sessionDuration / 60);
       const seconds = sessionDuration % 60;
       onPunishment({

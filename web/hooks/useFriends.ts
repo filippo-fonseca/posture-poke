@@ -41,47 +41,50 @@ export function useFriends() {
       return;
     }
 
-    const db = getFirebaseDb();
-    const q = query(
-      collection(db, "friendships"),
-      where("users", "array-contains", user.uid)
-    );
-    const snap = await getDocs(q);
+    try {
+      const db = getFirebaseDb();
+      const q = query(
+        collection(db, "friendships"),
+        where("users", "array-contains", user.uid)
+      );
+      const snap = await getDocs(q);
 
-    const accepted: FriendProfile[] = [];
-    const incoming: PendingRequest[] = [];
-    const outgoing: PendingRequest[] = [];
+      const accepted: FriendProfile[] = [];
+      const incoming: PendingRequest[] = [];
+      const outgoing: PendingRequest[] = [];
 
-    await Promise.all(
-      snap.docs.map(async (d) => {
-        const data = { id: d.id, ...d.data() } as FriendshipDoc;
-        const otherUid = data.users.find((u) => u !== user.uid);
-        if (!otherUid) return;
+      await Promise.all(
+        snap.docs.map(async (d) => {
+          try {
+            const data = { id: d.id, ...d.data() } as FriendshipDoc;
+            const otherUid = data.users.find((u) => u !== user.uid);
+            if (!otherUid) return;
 
-        // Resolve profile
-        const profileSnap = await getDoc(doc(db, "users", otherUid));
-        if (!profileSnap.exists()) return;
-        const pData = profileSnap.data();
-        const profile: FriendProfile = {
-          uid: otherUid,
-          email: pData.email ?? "",
-          displayName: pData.displayName ?? "Unknown",
-          photoURL: pData.photoURL ?? "",
-        };
+            const profileSnap = await getDoc(doc(db, "users", otherUid));
+            if (!profileSnap.exists()) return;
+            const pData = profileSnap.data();
+            const profile: FriendProfile = {
+              uid: otherUid,
+              email: pData.email ?? "",
+              displayName: pData.displayName ?? "Unknown",
+              photoURL: pData.photoURL ?? "",
+            };
 
-        if (data.status === "accepted") {
-          accepted.push(profile);
-        } else if (data.pendingFor === user.uid) {
-          incoming.push({ id: d.id, profile });
-        } else {
-          outgoing.push({ id: d.id, profile });
-        }
-      })
-    );
+            if (data.status === "accepted") {
+              accepted.push(profile);
+            } else if (data.pendingFor === user.uid) {
+              incoming.push({ id: d.id, profile });
+            } else {
+              outgoing.push({ id: d.id, profile });
+            }
+          } catch {}
+        })
+      );
 
-    setFriends(accepted);
-    setPendingIncoming(incoming);
-    setPendingOutgoing(outgoing);
+      setFriends(accepted);
+      setPendingIncoming(incoming);
+      setPendingOutgoing(outgoing);
+    } catch {}
     setLoading(false);
   }, [user]);
 
@@ -96,53 +99,53 @@ export function useFriends() {
       if (!trimmed) return "Enter an email";
       if (trimmed === user.email?.toLowerCase()) return "That's your own email";
 
-      const db = getFirebaseDb();
+      try {
+        const db = getFirebaseDb();
 
-      // Look up target user by email
-      const usersQ = query(
-        collection(db, "users"),
-        where("email", "==", trimmed),
-        limit(1)
-      );
-      const usersSnap = await getDocs(usersQ);
-      if (usersSnap.empty) return "No user found with that email";
+        const usersQ = query(
+          collection(db, "users"),
+          where("email", "==", trimmed),
+          limit(1)
+        );
+        const usersSnap = await getDocs(usersQ);
+        if (usersSnap.empty) return "No user found with that email";
 
-      const targetUid = usersSnap.docs[0].id;
-      const docId = friendshipId(user.uid, targetUid);
+        const targetUid = usersSnap.docs[0].id;
+        const docId = friendshipId(user.uid, targetUid);
 
-      // Check if friendship already exists
-      const existingSnap = await getDoc(doc(db, "friendships", docId));
-      if (existingSnap.exists()) {
-        const existing = existingSnap.data() as FriendshipDoc;
-        if (existing.status === "accepted") return "Already friends";
+        const existingSnap = await getDoc(doc(db, "friendships", docId));
+        if (existingSnap.exists()) {
+          const existing = existingSnap.data() as FriendshipDoc;
+          if (existing.status === "accepted") return "Already friends";
 
-        // Mutual request — the other person already sent us a request
-        if (existing.pendingFor === user.uid) {
-          await setDoc(doc(db, "friendships", docId), {
-            ...existing,
-            status: "accepted",
-            pendingFor: null,
-            acceptedAt: Date.now(),
-          });
-          await fetchFriendships();
-          return null; // success — auto-accepted
+          if (existing.pendingFor === user.uid) {
+            await setDoc(doc(db, "friendships", docId), {
+              ...existing,
+              status: "accepted",
+              pendingFor: null,
+              acceptedAt: Date.now(),
+            });
+            await fetchFriendships();
+            return null;
+          }
+
+          return "Request already sent";
         }
 
-        return "Request already sent";
+        await setDoc(doc(db, "friendships", docId), {
+          users: [user.uid, targetUid],
+          status: "pending",
+          initiatedBy: user.uid,
+          pendingFor: targetUid,
+          createdAt: Date.now(),
+          acceptedAt: null,
+        });
+
+        await fetchFriendships();
+        return null;
+      } catch {
+        return "Something went wrong. Try again.";
       }
-
-      // Create new pending request
-      await setDoc(doc(db, "friendships", docId), {
-        users: [user.uid, targetUid],
-        status: "pending",
-        initiatedBy: user.uid,
-        pendingFor: targetUid,
-        createdAt: Date.now(),
-        acceptedAt: null,
-      });
-
-      await fetchFriendships();
-      return null; // success
     },
     [user, fetchFriendships]
   );
