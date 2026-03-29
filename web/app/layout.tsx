@@ -19,6 +19,9 @@ const dmMono = DM_Mono({
 export const metadata: Metadata = {
   title: "PosturePoke — Real-time Posture Coaching",
   description: "we got your back. literally.",
+  icons: {
+    icon: { url: "/logo.svg", type: "image/svg+xml" },
+  },
 };
 
 export default function RootLayout({
@@ -33,6 +36,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <script
           dangerouslySetInnerHTML={{
             __html: `try{var t=localStorage.getItem("spinesync-theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme:dark)").matches))document.documentElement.classList.add("dark")}catch(e){}`,

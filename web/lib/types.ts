@@ -13,7 +13,8 @@ export interface MinuteBucket {
 export interface PunishmentMarker {
   time: string;
   secondsIn: number;
-  type: "fart" | "coach";
+  type: "beep" | "fart" | "coach";
+  poked?: boolean;
 }
 
 export interface CoachDoc {

@@ -988,30 +988,6 @@ function SessionDetailModal({
                 slouchThreshold={session.slouchThreshold}
               />
 
-              {session.punishmentMarkers &&
-                session.punishmentMarkers.length > 0 && (
-                  <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 p-4">
-                    <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-3">
-                      Punishments ({session.punishmentMarkers.length})
-                    </h3>
-                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                      {session.punishmentMarkers.map((m, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-3 text-sm"
-                        >
-                          <span className="font-mono text-xs text-zinc-400 dark:text-zinc-500 w-12">
-                            {m.time}
-                          </span>
-                          <span className="h-2 w-2 rounded-full bg-red-500" />
-                          <span className="text-zinc-600 dark:text-zinc-300">
-                            {m.type === "coach" ? "Coach clip" : "Fart sound"}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
             </>
           ) : (
             <p className="text-sm text-zinc-500 py-8 text-center">
@@ -1042,11 +1018,16 @@ function SessionChart({
   const greenStop = `${(1 - slouchThreshold / 50) * 100}%`;
   const amberStop = `${(1 - Math.min(slouchThreshold + 15, 50) / 50) * 100}%`;
 
-  const punishmentTimes = new Set(punishmentMarkers.map((m) => m.time));
-  const enrichedData = chartData.map((point) => ({
-    ...point,
-    punishment: punishmentTimes.has(point.time) ? point.delta : null,
-  }));
+  const punishmentMap = new Map(punishmentMarkers.map((m) => [m.time, m]));
+  const enrichedData = chartData.map((point) => {
+    const marker = punishmentMap.get(point.time);
+    return {
+      ...point,
+      punishment: marker ? point.delta : null,
+      punishmentType: marker?.type ?? null,
+      poked: marker?.poked ?? false,
+    };
+  });
 
   const tickInterval = Math.max(1, Math.floor(chartData.length / 15));
 
@@ -1146,17 +1127,20 @@ function SessionChart({
             content={({ active, payload }) => {
               if (active && payload?.length) {
                 const d = payload[0].payload;
-                const hasPunishment = d.punishment !== null;
+                if (d.punishment === null) {
+                  return (
+                    <div className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-1.5 shadow-sm">
+                      <p className="font-mono text-sm">{d.delta.toFixed(1)}&deg; at {d.time}</p>
+                    </div>
+                  );
+                }
+                const typeLabel = d.punishmentType === "beep" ? "Beep" : d.punishmentType === "fart" ? "Fart" : "Coach";
+                const label = d.poked ? `Poker + ${typeLabel}` : typeLabel;
+                const color = d.punishmentType === "beep" ? "text-emerald-500" : d.punishmentType === "fart" ? "text-orange-500" : "text-red-500";
                 return (
                   <div className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-1.5 shadow-sm">
-                    <p className="font-mono text-sm">
-                      {d.delta.toFixed(1)}&deg; at {d.time}
-                    </p>
-                    {hasPunishment && (
-                      <p className="text-xs text-red-500 mt-0.5">
-                        Punishment triggered
-                      </p>
-                    )}
+                    <p className="font-mono text-sm">{d.delta.toFixed(1)}&deg; at {d.time}</p>
+                    <p className={`text-xs mt-0.5 font-medium ${color}`}>{label}</p>
                   </div>
                 );
               }
@@ -1182,19 +1166,25 @@ function SessionChart({
                 cx: number;
                 cy: number;
                 index: number;
-                payload: { punishment: number | null };
+                payload: { punishment: number | null; punishmentType: string | null; poked: boolean };
               };
               if (payload.punishment === null) return <g key={`pd-${index}`} />;
+              const fillColor = payload.punishmentType === "beep" ? "#22c55e" : payload.punishmentType === "fart" ? "#f97316" : "#ef4444";
+              const bg = isDark ? "#18181b" : "#ffffff";
+              if (payload.poked) {
+                const s = 7;
+                return (
+                  <polygon
+                    key={`pd-${index}`}
+                    points={`${cx},${cy - s} ${cx - s},${cy + s * 0.6} ${cx + s},${cy + s * 0.6}`}
+                    fill={fillColor}
+                    stroke={bg}
+                    strokeWidth={2}
+                  />
+                );
+              }
               return (
-                <circle
-                  key={`pd-${index}`}
-                  cx={cx}
-                  cy={cy}
-                  r={5}
-                  fill="#ef4444"
-                  stroke={isDark ? "#18181b" : "#ffffff"}
-                  strokeWidth={2}
-                />
+                <circle key={`pd-${index}`} cx={cx} cy={cy} r={5} fill={fillColor} stroke={bg} strokeWidth={2} />
               );
             }}
             isAnimationActive={false}

@@ -12,10 +12,6 @@ const FART_SOUNDS = [
   "/audio/fart-05.mp3",
   "/audio/fart-06.mp3",
   "/audio/fart-07.mp3",
-  "/audio/fart-08.mp3",
-  "/audio/fart-squeak-01.mp3",
-  "/audio/fart-squeak-02.mp3",
-  "/audio/fart-squeak-03.mp3",
 ];
 
 const BEEP_SOUNDS = ["/audio/beep-01.mp3"];
@@ -79,37 +75,36 @@ export function useVoiceAlert({
       return;
     }
 
-    // Build pool of available sounds from enabled audio punishments
+    // Build pool of tagged sounds from enabled audio punishments
     const audioPunishments = settings.audioPunishments ?? [];
-    const soundPool: string[] = [];
-    let punishmentType: "fart" | "coach" = "fart";
+    const soundPool: { url: string; type: "beep" | "fart" | "coach" }[] = [];
 
-    for (const type of audioPunishments) {
-      if (type === "beep") {
-        soundPool.push(...BEEP_SOUNDS);
-      } else if (type === "farts") {
-        soundPool.push(...FART_SOUNDS);
-      } else if (type === "coach" && settings.coachAudioFiles.length > 0) {
-        soundPool.push(
-          ...settings.coachAudioFiles.map((f) => `/audio/${f}`)
+    for (const ap of audioPunishments) {
+      if (ap === "beep") {
+        BEEP_SOUNDS.forEach((u) => soundPool.push({ url: u, type: "beep" }));
+      } else if (ap === "farts") {
+        FART_SOUNDS.forEach((u) => soundPool.push({ url: u, type: "fart" }));
+      } else if (ap === "coach" && settings.coachAudioFiles.length > 0) {
+        settings.coachAudioFiles.forEach((f) =>
+          soundPool.push({ url: `/audio/${f}`, type: "coach" })
         );
       }
     }
 
+    let punishmentType: "beep" | "fart" | "coach" = "beep";
+
     // Play a random sound from the pool
     if (soundPool.length > 0) {
-      const soundUrl = soundPool[Math.floor(Math.random() * soundPool.length)];
-      // Determine type for the marker
-      if (soundUrl.includes("fart")) punishmentType = "fart";
-      else punishmentType = "coach";
-
-      const audio = new Audio(soundUrl);
+      const pick = soundPool[Math.floor(Math.random() * soundPool.length)];
+      punishmentType = pick.type;
+      const audio = new Audio(pick.url);
       audioRef.current = audio;
       audio.play().catch(() => {});
     }
 
     // Trigger the poker if enabled
-    if (settings.pokeEnabled) {
+    const poked = settings.pokeEnabled;
+    if (poked) {
       onPoke?.();
     }
 
@@ -120,6 +115,7 @@ export function useVoiceAlert({
         time: `${minutes}:${seconds.toString().padStart(2, "0")}`,
         secondsIn: sessionDuration,
         type: punishmentType,
+        poked,
       });
     }
   }, [
