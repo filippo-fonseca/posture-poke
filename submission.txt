@@ -1,3 +1,0 @@
-Project name: PosturePoke
-
-Elevator pitch: A posture monitor that fights slouching with escalating punishments — from fart sounds to AI voice coaches to a servo-powered poker. Track sessions, compete with friends, and share your spine's journey.
