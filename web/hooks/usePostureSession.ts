@@ -12,7 +12,6 @@ import {
 import {
   DEFAULT_TIP,
   CHART_HISTORY_SECONDS,
-  RECENT_HISTORY_SECONDS,
   TIP_TRIGGER_DURATION,
 } from "@/lib/constants";
 import { useSettings } from "@/lib/settings";
@@ -206,7 +205,7 @@ export function usePostureSession(): PostureSession {
 
     const allData = allSessionDataRef.current;
     setLiveChartData(allData.slice(-CHART_HISTORY_SECONDS));
-    setRecentChartData(allData.slice(-RECENT_HISTORY_SECONDS));
+    setRecentChartData([...allData]);
 
     const currentMinuteIndex = Math.floor(sessionDuration / 60);
     if (

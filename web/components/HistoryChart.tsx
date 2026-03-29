@@ -66,10 +66,10 @@ function RecentChart({ data }: { data: ChartDataPoint[] }) {
     <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
       <div className="mb-4 flex items-baseline justify-between">
         <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-          Recent Activity
+          Full Session
         </h3>
         <span className="text-xs text-zinc-400 dark:text-zinc-500">
-          Last {Math.min(10, Math.ceil(data.length / 60))} min
+          {Math.ceil(data.length / 60)} min
         </span>
       </div>
       <ResponsiveContainer width="100%" height={200}>
@@ -195,6 +195,7 @@ function SessionOverview({ data }: { data: MinuteBucket[] }) {
             tickFormatter={(v) => `${v}%`}
           />
           <Tooltip
+            cursor={false}
             content={({ active, payload }) => {
               if (active && payload?.length) {
                 const d = payload[0].payload as MinuteBucket;
@@ -219,7 +220,7 @@ function SessionOverview({ data }: { data: MinuteBucket[] }) {
               return null;
             }}
           />
-          <Bar dataKey="goodPct" radius={[3, 3, 0, 0]}>
+          <Bar dataKey="goodPct" radius={[6, 6, 0, 0]}>
             {data.map((entry, i) => (
               <Cell key={`cell-${i}`} fill={getBarColor(entry.goodPct)} />
             ))}
