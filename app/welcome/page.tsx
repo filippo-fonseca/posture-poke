@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useTheme } from "@/lib/theme";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
+import { SpineDecoration } from "@/components/SpineDecoration";
 
 const fade = {
   hidden: { opacity: 0, y: 20 },
@@ -96,6 +97,7 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <SpineDecoration />
       {/* Nav */}
       <header className="sticky top-0 z-50 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
@@ -105,12 +107,6 @@ export default function Landing() {
               PosturePoke
             </span>
             <div className="flex items-center gap-3">
-              <Link
-                href={appHref}
-                className="rounded-md bg-zinc-900 dark:bg-zinc-100 px-4 py-1.5 text-sm font-medium text-white dark:text-zinc-900 transition-colors hover:bg-zinc-700 dark:hover:bg-zinc-300"
-              >
-                {user ? "Dashboard" : "Launch App"}
-              </Link>
               <button
                 onClick={toggle}
                 className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
