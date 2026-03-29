@@ -53,7 +53,7 @@ export function LiveChart({ data }: LiveChartProps) {
   }
 
   return (
-    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+    <div className="flex-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 flex flex-col">
       <h3 className="mb-4 text-sm font-medium text-zinc-500 dark:text-zinc-400">
         Deviation &mdash; Last 60 Seconds
       </h3>

@@ -26,12 +26,17 @@ export function useSerial(): UseSerial {
   const abortRef = useRef<AbortController | null>(null);
   const lineBufferRef = useRef("");
 
+  const lastPitchRef = useRef(0);
+
   const processLine = useCallback((line: string) => {
     // Arduino sends "pitch,roll\n"
     const parts = line.split(",");
     if (parts.length < 2) return;
     const pitch = parseFloat(parts[0]);
     if (isNaN(pitch)) return;
+    // Dead zone: ignore changes smaller than 0.3° to filter sensor noise
+    if (Math.abs(pitch - lastPitchRef.current) < 0.3) return;
+    lastPitchRef.current = pitch;
     setRawPitch(pitch);
   }, []);
 

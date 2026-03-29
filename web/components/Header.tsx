@@ -1,23 +1,13 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { useTheme } from "@/lib/theme";
 import { useAuth } from "@/lib/auth";
 
 interface HeaderProps {
-  isConnected: boolean;
-  sessionDuration: number;
   onSettingsClick?: () => void;
 }
 
-function formatTime(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-}
-
-export function Header({ isConnected, sessionDuration, onSettingsClick }: HeaderProps) {
+export function Header({ onSettingsClick }: HeaderProps) {
   const { theme, toggle } = useTheme();
   const { user, signOut } = useAuth();
 
@@ -25,29 +15,12 @@ export function Header({ isConnected, sessionDuration, onSettingsClick }: Header
     <header className="sticky top-0 z-50 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-14 items-center justify-between">
-          <h1 className="text-lg font-bold tracking-tight">PosturePoke</h1>
+          <h1 className="flex items-center gap-2 text-lg font-bold tracking-tight">
+            <img src="/logo.svg" alt="" className="h-5 w-5 dark:invert" />
+            PosturePoke
+          </h1>
 
           <div className="flex items-center gap-2">
-            {isConnected ? (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex items-center gap-2 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1"
-              >
-                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                <span className="font-mono text-xs text-emerald-700 dark:text-emerald-400">
-                  Live &middot; {formatTime(sessionDuration)}
-                </span>
-              </motion.div>
-            ) : (
-              <div className="flex items-center gap-2 rounded-full bg-amber-50 dark:bg-amber-950/40 px-3 py-1 animate-pulse-dot">
-                <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                <span className="font-mono text-xs text-amber-700 dark:text-amber-400">
-                  Connecting...
-                </span>
-              </div>
-            )}
-
             <button
               onClick={onSettingsClick}
               className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"

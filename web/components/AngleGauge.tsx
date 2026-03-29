@@ -57,7 +57,7 @@ export function AngleGauge({ currentDelta }: AngleGaugeProps) {
   ];
 
   return (
-    <div className="flex flex-col items-center rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5">
+    <div className="flex flex-1 flex-col items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5">
       <svg
         width={size}
         height={size / 2 + 30}
