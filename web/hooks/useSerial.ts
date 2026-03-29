@@ -14,6 +14,8 @@ interface UseSerial {
   disconnect: () => void;
   /** Set current pitch as the 0° baseline */
   calibrate: () => void;
+  /** Send a raw command string to the Arduino (e.g. "SERVO:90") */
+  sendCommand: (cmd: string) => void;
 }
 
 export function useSerial(): UseSerial {
@@ -23,6 +25,7 @@ export function useSerial(): UseSerial {
 
   const portRef = useRef<SerialPort | null>(null);
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
+  const writerRef = useRef<WritableStreamDefaultWriter<Uint8Array> | null>(null);
   const lineBufferRef = useRef("");
   const mountedRef = useRef(true);
   const lastPitchRef = useRef(0);
@@ -65,10 +68,20 @@ export function useSerial(): UseSerial {
     if (mountedRef.current) setIsConnected(false);
   }, [processLine]);
 
+  const sendCommand = useCallback((cmd: string) => {
+    if (!writerRef.current) return;
+    const encoder = new TextEncoder();
+    writerRef.current.write(encoder.encode(cmd + "\n")).catch(() => {});
+  }, []);
+
   const disconnect = useCallback(async () => {
     if (readerRef.current) {
       try { await readerRef.current.cancel(); } catch {}
       readerRef.current = null;
+    }
+    if (writerRef.current) {
+      try { writerRef.current.releaseLock(); } catch {}
+      writerRef.current = null;
     }
     if (portRef.current) {
       try { await portRef.current.close(); } catch {}
@@ -83,6 +96,12 @@ export function useSerial(): UseSerial {
       const port = await navigator.serial.requestPort();
       await port.open({ baudRate: 115200 });
       portRef.current = port;
+
+      // Grab writer for sending commands
+      if (port.writable) {
+        writerRef.current = port.writable.getWriter();
+      }
+
       if (mountedRef.current) setIsConnected(true);
       lineBufferRef.current = "";
       readLoop(port);
@@ -99,10 +118,13 @@ export function useSerial(): UseSerial {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      // Fire-and-forget cleanup — no state updates since we're unmounted
       if (readerRef.current) {
         readerRef.current.cancel().catch(() => {});
         readerRef.current = null;
+      }
+      if (writerRef.current) {
+        try { writerRef.current.releaseLock(); } catch {}
+        writerRef.current = null;
       }
       if (portRef.current) {
         portRef.current.close().catch(() => {});
@@ -120,5 +142,6 @@ export function useSerial(): UseSerial {
     connect,
     disconnect,
     calibrate,
+    sendCommand,
   };
 }

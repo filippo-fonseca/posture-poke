@@ -36,6 +36,7 @@ export interface Settings {
   harshness: number;
   instructionType: InstructionType;
   activeCoachId: string | null;
+  activeCoachOwnerUid: string | null;
   coachAudioFiles: string[];
 }
 
@@ -44,6 +45,7 @@ const DEFAULT_SETTINGS: Settings = {
   harshness: 2,
   instructionType: "farts",
   activeCoachId: null,
+  activeCoachOwnerUid: null,
   coachAudioFiles: [],
 };
 

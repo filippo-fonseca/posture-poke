@@ -41,6 +41,23 @@ export interface SessionDoc {
   punishmentMarkers: PunishmentMarker[];
 }
 
+export interface FriendshipDoc {
+  id?: string;
+  users: string[];
+  status: "pending" | "accepted";
+  initiatedBy: string;
+  pendingFor: string | null;
+  createdAt: number;
+  acceptedAt: number | null;
+}
+
+export interface FriendProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL: string;
+}
+
 export type SessionState = "idle" | "running" | "paused";
 
 export interface SessionSaveData {
@@ -94,5 +111,6 @@ export interface PostureSession {
 
   // Actions
   calibrate: () => void;
+  sendCommand: (cmd: string) => void;
   fetchTip: () => void;
 }

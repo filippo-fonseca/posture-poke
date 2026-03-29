@@ -340,6 +340,7 @@ export function usePostureSession(): PostureSession {
 
     // Actions
     calibrate: serial.calibrate,
+    sendCommand: serial.sendCommand,
     fetchTip,
   };
 }

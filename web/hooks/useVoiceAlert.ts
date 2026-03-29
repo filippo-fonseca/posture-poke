@@ -26,6 +26,7 @@ interface UseVoiceAlertProps {
   sessionDuration: number;
   sessionRunning: boolean;
   onPunishment?: (marker: PunishmentMarker) => void;
+  onPoke?: () => void;
 }
 
 export function useVoiceAlert({
@@ -34,14 +35,15 @@ export function useVoiceAlert({
   sessionDuration,
   sessionRunning,
   onPunishment,
+  onPoke,
 }: UseVoiceAlertProps) {
   const { settings, punishmentDelay } = useSettings();
 
   // How many punishments have fired in this slouch bout
   const hitCountRef = useRef(0);
-  // Next threshold (in seconds of slouching) to trigger a punishment
   const nextTriggerRef = useRef(0);
   const wasSlouchingRef = useRef(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (!sessionRunning) return;
@@ -74,6 +76,11 @@ export function useVoiceAlert({
     const nextDelay = Math.min(nextMultiplier * punishmentDelay, MAX_DELAY);
     nextTriggerRef.current = currentSlouchDuration + nextDelay;
 
+    // Skip if previous clip is still playing
+    if (audioRef.current && !audioRef.current.ended && !audioRef.current.paused) {
+      return;
+    }
+
     // Play sound
     const isCoach =
       settings.instructionType === "coach" &&
@@ -91,7 +98,11 @@ export function useVoiceAlert({
     }
 
     const audio = new Audio(soundUrl);
+    audioRef.current = audio;
     audio.play().catch(() => {});
+
+    // Trigger the needle
+    onPoke?.();
 
     if (onPunishment) {
       const minutes = Math.floor(sessionDuration / 60);
@@ -111,5 +122,6 @@ export function useVoiceAlert({
     settings.instructionType,
     settings.coachAudioFiles,
     onPunishment,
+    onPoke,
   ]);
 }

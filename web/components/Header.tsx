@@ -35,6 +35,14 @@ export function Header({ onSettingsClick, sessionActive, onStopSession }: Header
           </h1>
 
           <div className="flex items-center gap-2">
+            {sessionActive && (
+              <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1">
+                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse-dot" />
+                <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                  Session in progress
+                </span>
+              </div>
+            )}
             <button
               onClick={onSettingsClick}
               className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"

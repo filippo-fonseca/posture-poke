@@ -138,12 +138,24 @@ function DashboardContent() {
     punishmentMarkersRef.current.push(marker);
   }, []);
 
+  const pokingRef = useRef(false);
+  const handlePoke = useCallback(() => {
+    if (pokingRef.current) return;
+    pokingRef.current = true;
+    session.sendCommand("SERVO:90");
+    setTimeout(() => {
+      session.sendCommand("SERVO:0");
+      pokingRef.current = false;
+    }, 1000);
+  }, [session]);
+
   useVoiceAlert({
     isSlouchingNow: session.isSlouchingNow,
     currentSlouchDuration: session.currentSlouchDuration,
     sessionDuration: session.sessionDuration,
     sessionRunning: session.sessionState === "running",
     onPunishment: handlePunishment,
+    onPoke: handlePoke,
   });
 
   const handleStop = async () => {
@@ -299,7 +311,9 @@ function IdleView({
     <div className="space-y-8">
       {/* Hero section */}
       <div>
-        <h2 className="text-xl font-bold tracking-tight mb-3">Time for work? Watch your back.</h2>
+        <h2 className="text-xl font-bold tracking-tight mb-3">
+          Time for work? Watch your back.
+        </h2>
       </div>
       <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
         <div className="flex flex-col sm:flex-row">
@@ -318,8 +332,20 @@ function IdleView({
                 className="w-full rounded-lg bg-amber-500 dark:bg-amber-600 px-8 py-3.5 text-sm font-medium text-white transition-colors hover:bg-amber-600 dark:hover:bg-amber-700"
               >
                 <span className="flex items-center justify-center gap-2">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M6 3v12" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 01-9 9" />
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M6 3v12" />
+                    <circle cx="18" cy="6" r="3" />
+                    <circle cx="6" cy="18" r="3" />
+                    <path d="M18 9a9 9 0 01-9 9" />
                   </svg>
                   Connect Sensor
                 </span>
@@ -442,13 +468,47 @@ function MiniSessionChart({ session: s }: { session: SessionDoc }) {
             margin={{ top: 2, right: 2, left: 2, bottom: 2 }}
           >
             <defs>
-              <linearGradient id="idleMiniFill" x1="0" y1="0" x2="0" y2="80" gradientUnits="userSpaceOnUse">
-                <stop key="f0" offset="0%" stopColor="#ef4444" stopOpacity={isDark ? 0.2 : 0.1} />
-                <stop key="f1" offset={greenStop} stopColor="#ef4444" stopOpacity={0.02} />
-                <stop key="f2" offset={greenStop} stopColor="#22c55e" stopOpacity={0.02} />
-                <stop key="f3" offset="100%" stopColor="#22c55e" stopOpacity={isDark ? 0.2 : 0.1} />
+              <linearGradient
+                id="idleMiniFill"
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="80"
+                gradientUnits="userSpaceOnUse"
+              >
+                <stop
+                  key="f0"
+                  offset="0%"
+                  stopColor="#ef4444"
+                  stopOpacity={isDark ? 0.2 : 0.1}
+                />
+                <stop
+                  key="f1"
+                  offset={greenStop}
+                  stopColor="#ef4444"
+                  stopOpacity={0.02}
+                />
+                <stop
+                  key="f2"
+                  offset={greenStop}
+                  stopColor="#22c55e"
+                  stopOpacity={0.02}
+                />
+                <stop
+                  key="f3"
+                  offset="100%"
+                  stopColor="#22c55e"
+                  stopOpacity={isDark ? 0.2 : 0.1}
+                />
               </linearGradient>
-              <linearGradient id="idleMiniStroke" x1="0" y1="0" x2="0" y2="80" gradientUnits="userSpaceOnUse">
+              <linearGradient
+                id="idleMiniStroke"
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="80"
+                gradientUnits="userSpaceOnUse"
+              >
                 <stop key="s0" offset="0%" stopColor="#ef4444" />
                 <stop key="s1" offset={amberStop} stopColor="#ef4444" />
                 <stop key="s2" offset={amberStop} stopColor="#f59e0b" />
@@ -547,7 +607,12 @@ function ShareModal({
   summary,
   onClose,
 }: {
-  summary: { goodPct: number; duration: number; alerts: number; bestStreak: number };
+  summary: {
+    goodPct: number;
+    duration: number;
+    alerts: number;
+    bestStreak: number;
+  };
   onClose: () => void;
 }) {
   const mins = Math.floor(summary.duration / 60);
@@ -616,23 +681,39 @@ function ShareModal({
             <span className={`font-mono text-2xl font-medium ${pctColor}`}>
               {summary.goodPct}%
             </span>
-            <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">Good Posture</p>
+            <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+              Good Posture
+            </p>
           </div>
           <div className="rounded-lg bg-zinc-50 dark:bg-zinc-900 p-3 text-center">
-            <span className="font-mono text-2xl font-medium">{durationStr}</span>
-            <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">Duration</p>
+            <span className="font-mono text-2xl font-medium">
+              {durationStr}
+            </span>
+            <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+              Duration
+            </p>
           </div>
           <div className="rounded-lg bg-zinc-50 dark:bg-zinc-900 p-3 text-center">
-            <span className="font-mono text-2xl font-medium">{summary.alerts}</span>
-            <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">Alerts</p>
+            <span className="font-mono text-2xl font-medium">
+              {summary.alerts}
+            </span>
+            <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+              Alerts
+            </p>
           </div>
           <div className="rounded-lg bg-zinc-50 dark:bg-zinc-900 p-3 text-center">
-            <span className="font-mono text-2xl font-medium">{Math.floor(summary.bestStreak / 60)}m {summary.bestStreak % 60}s</span>
-            <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">Best Streak</p>
+            <span className="font-mono text-2xl font-medium">
+              {Math.floor(summary.bestStreak / 60)}m {summary.bestStreak % 60}s
+            </span>
+            <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+              Best Streak
+            </p>
           </div>
         </div>
 
-        <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center mb-3">Share your results</p>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center mb-3">
+          Share your results
+        </p>
 
         <div className="grid grid-cols-4 gap-2 mb-5">
           {platforms.map((p) => (
@@ -976,7 +1057,6 @@ function SettingsPanel({ onBack }: { onBack: () => void }) {
     createCoach,
     deleteCoach,
   } = useCoaches();
-  const { settings } = useSettings();
   const [isGenerating, setIsGenerating] = useState(false);
   const [coachPrompt, setCoachPrompt] = useState("");
   const [generateError, setGenerateError] = useState<string | null>(null);
@@ -1039,21 +1119,12 @@ function SettingsPanel({ onBack }: { onBack: () => void }) {
             {coaches.map((coach) => (
               <div
                 key={coach.id}
-                className={`rounded-lg border p-3 flex items-center justify-between transition-colors ${
-                  settings.activeCoachId === coach.id
-                    ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20"
-                    : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
-                }`}
+                className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 flex items-center justify-between"
               >
                 <div className="flex-1 min-w-0 mr-3">
                   <p className="text-sm truncate">{coach.description}</p>
                   <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">
                     {coach.audioFiles.length} clips
-                    {settings.activeCoachId === coach.id && (
-                      <span className="ml-2 text-emerald-600 dark:text-emerald-400 font-medium">
-                        Active
-                      </span>
-                    )}
                   </p>
                 </div>
                 <button
