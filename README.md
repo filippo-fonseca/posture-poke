@@ -51,6 +51,10 @@ Arduino Nano 33 BLE ──USB Serial──> Browser (Web Serial API) ──> Nex
 
 ## Quick Start
 
+### Important: Hardware Required
+
+PosturePoke requires a physical Arduino Nano 33 BLE Sense Rev2 with the BMI270 IMU to function. The app uses the Web Serial API to communicate directly with the device over USB — there is no simulation mode. Without the sensor connected, you can browse past sessions and manage coaches, but you cannot start a posture monitoring session.
+
 ### Hardware
 
 Flash `serial/posture_poke.ino` to an Arduino Nano 33 BLE Sense Rev2. Wire a servo to pin 9 for The Poker (optional).
@@ -63,7 +67,7 @@ cp .env.example .env.local   # fill in API keys
 npm run dev
 ```
 
-Open `http://localhost:3000`. Connect the sensor via the Web Serial port picker.
+Open `http://localhost:3000` in Chrome (Web Serial requires Chrome/Edge). Connect the sensor via the port picker.
 
 ### Environment Variables
 
