@@ -28,17 +28,17 @@ Mix and match. Stack them. Or pick "I'm scared" mode and pretend you have a good
 ## How It Works
 
 ```
-Arduino Nano 33 BLE ──USB Serial──> Browser (Web Serial API) ──> Next.js App
+PosturePoke Device ──USB Serial──> Browser (Web Serial API) ──> Next.js App
         │                                                              │
-    BMI270 IMU                                                   Punishments
+    IMU sensor                                                   Punishments
    reads pitch/roll                                          (audio + servo poke)
    at 10 Hz                                                         │
         │                                                    Gemini + ElevenLabs
-        └── Servo (The Poker) <── SERVO:90/SERVO:0 ──────── (AI coach generation)
+        └── The Poker (servo) <── SERVO:90/SERVO:0 ──────── (AI coach generation)
 ```
 
-1. **Clip it on** — attach the sensor to your collar
-2. **Connect** — the browser talks directly to the Arduino via Web Serial API (no server needed)
+1. **Clip it on** — attach the PosturePoke device to your collar
+2. **Connect** — the browser talks directly to the device via Web Serial API (no server needed)
 3. **Calibrate** — sit up straight, press calibrate, that's your 0 degrees
 4. **Get wrecked** — slouch too long and your chosen punishment kicks in
 
@@ -53,11 +53,11 @@ Arduino Nano 33 BLE ──USB Serial──> Browser (Web Serial API) ──> Nex
 
 ### Important: Hardware Required
 
-PosturePoke requires a physical Arduino Nano 33 BLE Sense Rev2 with the BMI270 IMU to function. The app uses the Web Serial API to communicate directly with the device over USB — there is no simulation mode. Without the sensor connected, you can browse past sessions and manage coaches, but you cannot start a posture monitoring session.
+PosturePoke requires the PosturePoke device to function. The app uses the Web Serial API to communicate directly with the device over USB — there is no simulation mode. Without the device connected, you can browse past sessions and manage coaches, but you cannot start a posture monitoring session.
 
 ### Hardware
 
-Flash `serial/posture_poke.ino` to an Arduino Nano 33 BLE Sense Rev2. Wire a servo to pin 9 for The Poker (optional).
+Flash `serial/posture_poke.ino` to the PosturePoke device. The Poker (servo) is built into the device.
 
 ### Web App
 
@@ -80,7 +80,7 @@ Open `http://localhost:3000` in Chrome (Web Serial requires Chrome/Edge). Connec
 ## Tech Stack
 
 - **Frontend**: Next.js (App Router), TypeScript, Tailwind CSS, Recharts, Framer Motion
-- **Hardware**: Arduino Nano 33 BLE Sense Rev2, BMI270 IMU, micro servo
+- **Hardware**: PosturePoke device (IMU sensor + servo poker)
 - **Browser APIs**: Web Serial API (direct USB serial, no backend needed)
 - **AI**: Gemini 2.5 Flash (script generation), ElevenLabs (voice design + TTS)
 - **Backend**: Firebase Auth (Google OAuth), Firestore (sessions, coaches, friends)
@@ -103,6 +103,15 @@ Open `http://localhost:3000` in Chrome (Web Serial requires Chrome/Edge). Connec
 │   └── posture_poke.ino  # Combined IMU + servo firmware
 └── firestore.rules       # Security rules
 ```
+
+## Built With (Hackathon Details)
+
+- **IDE**: [Zed](https://zed.dev)
+- **APIs used**:
+  - [Gemini 2.5 Flash](https://ai.google.dev/) — generates 10 funny, in-character posture correction scripts from a user's coach description
+  - [ElevenLabs](https://elevenlabs.io/) — designs a custom voice from a text description and generates text-to-speech audio for each script
+- **Auth & Database**: Firebase (Google OAuth + Firestore)
+- **No backend server** — the Next.js app talks to the hardware directly via the Web Serial API and uses Next.js API routes for AI coach generation
 
 ---
 
