@@ -1,5 +1,41 @@
 # PosturePoke
 
+<!-- <p align="center">
+  <img src="logo.png" alt="PosturePoke Logo" width="120" />
+</p> -->
+
+<h1 align="center">PosturePoke</h1>
+
+<p align="center"><strong>Watch your back.</strong></p>
+
+<p align="center">
+  🏆 <strong>5th Place — <a href="https://yhack.org">YHack 2026</a> Hardware Category</strong>
+</p>
+
+<p align="center">
+  Built by
+  <a href="https://www.linkedin.com/in/filippo-fonseca/">Filippo Fonseca</a> &
+  <a href="https://www.linkedin.com/in/emir-ahmed-6016422a1/">Emir Ahmed</a>
+</p>
+
+<p align="center">
+  <a href="https://devpost.com/software/posturepoke">
+    <img src="https://img.shields.io/badge/Devpost-PosturePoke-003E54?style=for-the-badge&logo=devpost&logoColor=white" alt="Devpost" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=zGTd4aQPPI8">
+    <img src="https://img.youtube.com/vi/zGTd4aQPPI8/maxresdefault.jpg" alt="PosturePoke Demo Video" width="600" />
+  </a>
+  <br />
+  <sub>▶️ Click to watch the demo</sub>
+</p>
+
+---
+
+---
+
 **Watch your back.**
 
 ---
